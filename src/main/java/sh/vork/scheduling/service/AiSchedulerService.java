@@ -44,6 +44,7 @@ public class AiSchedulerService {
 
         ScheduledJob normalized = new ScheduledJob(
                 id,
+            job.name(),
                 job.aiPrompt(),
                 job.sessionUuid(),
                 job.username(),
@@ -89,6 +90,7 @@ public class AiSchedulerService {
 
         jobRepository.save(new ScheduledJob(
                 existing.id(),
+            existing.name(),
                 existing.aiPrompt(),
                 existing.sessionUuid(),
                 existing.username(),

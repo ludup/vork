@@ -9,6 +9,7 @@ import sh.vork.database.DatabaseEntity;
  */
 public record ScheduledJob(
         String id,
+    String name,
         String aiPrompt,
         String sessionUuid,
         String username,

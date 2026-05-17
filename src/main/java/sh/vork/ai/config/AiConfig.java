@@ -9,8 +9,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -18,12 +20,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.ClassUtils;
+import org.slf4j.MDC;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -44,12 +50,16 @@ import sh.vork.ai.function.SaveTypeInstanceRequest;
 import sh.vork.ai.function.SearchTypeInstancesRequest;
 import sh.vork.database.DatabaseRepository;
 import sh.vork.database.SortOrder;
+import sh.vork.scheduling.domain.DurationType;
+import sh.vork.scheduling.domain.ScheduledJob;
+import sh.vork.scheduling.service.AiSchedulerService;
 import sh.vork.typegen.JavaType;
 import sh.vork.typegen.JavaTypeClassLoader;
 import sh.vork.typegen.SqlParseException;
 import sh.vork.typegen.TypeDatabaseService;
 import sh.vork.typegen.TypeGenerationException;
 import sh.vork.typegen.TypeGeneratorService;
+import sh.vork.ai.tool.ScheduleTaskRequest;
 
 /**
  * Wires all AI-related Spring beans.
@@ -113,7 +123,7 @@ public class AiConfig {
      *     return ChatClient.builder(openAiModel)
      *             .defaultToolCallbacks(getCurrentWeather)
      *             .build();
-     * }
+* }
      * }</pre>
      */
     @Bean
@@ -142,6 +152,12 @@ public class AiConfig {
         Authorization text rule:
         - Provide concise supervisor-facing reasoning that can be shown in authorization review.
         - Keep it user-friendly plain language, avoid internal API/tool names, and explain why the action is needed.
+
+                SCHEDULING PROTOCOL:
+                - When a user asks for background, later, delayed, or recurring execution, invoke scheduleBackgroundTask.
+                - You must provide a non-empty jobName for every scheduleBackgroundTask call.
+                - Because background execution is detached and runs later, backgroundPrompt must contain all required parameters,
+                    assumptions, and schema details needed to complete the task without chat-history access.
 
         REASONING_HINT rule:
         - A tool description may include a line starting with 'REASONING_HINT:'.
@@ -205,6 +221,76 @@ public class AiConfig {
     // -------------------------------------------------------------------------
     // Function-calling tools
     // -------------------------------------------------------------------------
+
+    /**
+     * {@code scheduleBackgroundTask} tool — persists and schedules a background AI
+     * job for one-time or recurring execution.
+     */
+    @Bean
+    public ToolCallback scheduleBackgroundTask(ObjectProvider<AiSchedulerService> schedulerServiceProvider) {
+        return FunctionToolCallback
+                .builder("scheduleBackgroundTask", (ScheduleTaskRequest req) -> {
+                    String jobName = req == null ? null : req.jobName();
+                    String backgroundPrompt = req == null ? null : req.backgroundPrompt();
+                    String startIsoTime = req == null ? null : req.startIsoTime();
+                    String durationTypeRaw = req == null ? null : req.durationType();
+
+                    if (jobName == null || jobName.isBlank()) {
+                        return "{\"status\":\"error\",\"message\":\"jobName is required\"}";
+                    }
+                    if (backgroundPrompt == null || backgroundPrompt.isBlank()) {
+                        return "{\"status\":\"error\",\"message\":\"backgroundPrompt is required\"}";
+                    }
+                    if (startIsoTime == null || startIsoTime.isBlank()) {
+                        return "{\"status\":\"error\",\"message\":\"startIsoTime is required\"}";
+                    }
+
+                    Instant startTime;
+                    try {
+                        startTime = Instant.parse(startIsoTime.trim());
+                    } catch (Exception ex) {
+                        return "{\"status\":\"error\",\"message\":\"startIsoTime must be a valid ISO-8601 instant\"}";
+                    }
+
+                    DurationType durationType;
+                    try {
+                        String normalizedType = durationTypeRaw == null
+                                ? DurationType.SECONDS.name()
+                                : durationTypeRaw.trim().toUpperCase(Locale.ROOT);
+                        durationType = DurationType.valueOf(normalizedType);
+                    } catch (Exception ex) {
+                        return "{\"status\":\"error\",\"message\":\"durationType must be one of: SECONDS, MINUTES, HOURS, DAYS, WEEKS, MONTHS\"}";
+                    }
+
+                    String username = resolveUsername();
+                    String sessionUuid = resolveSessionUuid();
+
+                    ScheduledJob job = new ScheduledJob(
+                            null,
+                            jobName.trim(),
+                            backgroundPrompt,
+                            sessionUuid,
+                            username,
+                            startTime,
+                            req.repeatInterval(),
+                            durationType,
+                            null);
+
+                    try {
+                        ScheduledJob scheduled = schedulerServiceProvider.getObject().scheduleJob(job);
+                        return objectMapper.writeValueAsString(Map.of(
+                                "status", "scheduled",
+                                "jobId", scheduled.id(),
+                                "jobName", scheduled.name()
+                        ));
+                    } catch (Exception ex) {
+                        return "{\"status\":\"error\",\"message\":\"" + ex.getMessage().replace("\"", "'") + "\"}";
+                    }
+                })
+                .description("Schedules an instructional command prompt pass to execute asynchronously in a background runner process according to a specified calendar interval delay.")
+                .inputType(ScheduleTaskRequest.class)
+                .build();
+    }
 
     /**
      * {@code getURLContents} tool — fetches text content from an HTTP/HTTPS URL.
@@ -619,5 +705,21 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
             return "{\"type\":\"array\",\"items\":" + itemSchema + "}";
         }
         return buildSchema(type);
+    }
+
+    private static String resolveUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
+            return "anonymous";
+        }
+        return auth.getName();
+    }
+
+    private static String resolveSessionUuid() {
+        String sessionUuid = MDC.get("sessionUuid");
+        if (sessionUuid == null || sessionUuid.isBlank() || "<null>".equals(sessionUuid)) {
+            return "system";
+        }
+        return sessionUuid;
     }
 }

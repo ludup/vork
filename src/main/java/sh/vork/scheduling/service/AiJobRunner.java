@@ -43,6 +43,7 @@ public class AiJobRunner implements Runnable {
             if (job.repeatDuration() == 0) {
                 jobRepository.save(new ScheduledJob(
                         job.id(),
+                    job.name(),
                         job.aiPrompt(),
                         job.sessionUuid(),
                         job.username(),
