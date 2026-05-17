@@ -10,19 +10,25 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiChatMessage.AttachmentRef;
 import sh.vork.ai.entity.AiChatMessage.ToolCallRef;
 import sh.vork.ai.entity.AiSession;
+import sh.vork.ai.protocol.UiEventFrame;
 import sh.vork.ai.security.ToolSuspensionException;
 import sh.vork.database.DatabaseRepository;
 import sh.vork.storage.FileStorageService;
@@ -45,13 +51,19 @@ public class ChatService {
     private final DatabaseRepository<AiSession> sessionRepo;
     private final AiOrchestrationService        aiService;
     private final FileStorageService            fileStorageService;
+    private final SimpMessagingTemplate         messaging;
+    private final ObjectMapper                  objectMapper;
   
     public ChatService(DatabaseRepository<AiSession> aiSessionRepository,
                        AiOrchestrationService aiOrchestrationService,
-                       FileStorageService fileStorageService) {
+                       FileStorageService fileStorageService,
+                       SimpMessagingTemplate messaging,
+                       ObjectMapper objectMapper) {
         this.sessionRepo         = aiSessionRepository;
         this.aiService           = aiOrchestrationService;
         this.fileStorageService  = fileStorageService;
+        this.messaging           = messaging;
+        this.objectMapper        = objectMapper;
     }
 
     /**
@@ -176,10 +188,37 @@ public class ChatService {
             List<ToolCallRef> pendingToolCalls = List.of(
                     new ToolCallRef(simulatedToolCallId, "FUNCTION", ex.getToolName(), ex.getArguments()));
 
+            String eventId = UUID.randomUUID().toString();
+            UiEventFrame promptEvent = new UiEventFrame(
+                eventId,
+                "PROMPT_REQUIRED",
+                "AUTHORIZE_TOOL",
+                java.util.Map.of(
+                    "toolName", ex.getToolName(),
+                    "toolCallId", simulatedToolCallId,
+                    "arguments", ex.getArguments(),
+                    "actions", java.util.List.of("ONCE", "SESSION", "ALWAYS", "DENIED")
+                ));
+
+            String promptJson;
+            try {
+            promptJson = objectMapper.writeValueAsString(promptEvent);
+            } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize suspension event", e);
+            }
+
+                try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid);
+                 MDC.MDCCloseable eid = MDC.putCloseable("eventId", eventId)) {
+                log.info("Prompt required event created [tool={}, toolCallId={}]",
+                    ex.getToolName(), simulatedToolCallId);
+                log.debug("Prompt required event payload: {}",
+                    promptJson.length() > 4000 ? promptJson.substring(0, 4000) + "...<truncated>" : promptJson);
+                }
+
             AiChatMessage awaiting = new AiChatMessage(
                     UUID.randomUUID().toString(),
-                    "AWAITING_AUTHORIZATION",
-                    "Tool call requires authorization: " + ex.getToolName(),
+                "PROMPT_REQUIRED",
+                promptJson,
                     System.currentTimeMillis(),
                     refs.isEmpty() ? null : Collections.unmodifiableList(refs),
                     pendingToolCalls,
@@ -190,7 +229,9 @@ public class ChatService {
             updated.add(userMsg);
             updated.add(awaiting);
             sessionRepo.save(new AiSession(session.uuid(), session.provider(), session.createdAt(),
-                    List.copyOf(updated), "AWAITING_AUTHORIZATION"));
+                    List.copyOf(updated), "AWAITING_INPUT"));
+
+                messaging.convertAndSend("/topic/chat/" + sessionUuid, promptEvent);
 
             log.info("Tool suspension caught for tool: {}. Frozen session state [session={}]",
                     ex.getToolName(), sessionUuid);

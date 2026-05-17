@@ -7,15 +7,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiSession;
+import sh.vork.ai.protocol.UiEventFrame;
 import sh.vork.ai.security.ToolSuspensionException;
 import sh.vork.database.mock.MapDatabaseRepository;
 import sh.vork.storage.FileStorageService;
@@ -23,10 +28,12 @@ import sh.vork.storage.FileStorageService;
 class ChatServiceSuspensionPersistenceTest {
 
     @Test
-    void sendMessage_whenToolSuspended_persistsAwaitingAuthorizationSnapshot() {
+    void sendMessage_whenToolSuspended_persistsAwaitingAuthorizationSnapshot() throws Exception {
         MapDatabaseRepository<AiSession> sessionRepo = new MapDatabaseRepository<>(AiSession.class);
         AiOrchestrationService aiService = mock(AiOrchestrationService.class);
         FileStorageService fileStorageService = mock(FileStorageService.class);
+        SimpMessagingTemplate messaging = mock(SimpMessagingTemplate.class);
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
         String sessionId = "session-1";
         AiSession initial = new AiSession(sessionId, AiProvider.GEMINI.name(), 123L, List.of(), null);
@@ -44,7 +51,7 @@ class ChatServiceSuspensionPersistenceTest {
             any(AiProvider.class)))
                 .thenReturn("unused");
 
-        ChatService chatService = new ChatService(sessionRepo, aiService, fileStorageService);
+        ChatService chatService = new ChatService(sessionRepo, aiService, fileStorageService, messaging, objectMapper);
 
         AiChatMessage out = chatService.sendMessage(sessionId, "please compile", null, AiProvider.GEMINI);
 
@@ -52,16 +59,19 @@ class ChatServiceSuspensionPersistenceTest {
 
         AiSession saved = sessionRepo.get(sessionId);
         assertNotNull(saved);
-        assertEquals("AWAITING_AUTHORIZATION", saved.status());
-        assertEquals(2, saved.messages().size(), "Expected persisted USER + AWAITING_AUTHORIZATION messages");
+        assertEquals("AWAITING_INPUT", saved.status());
+        assertEquals(2, saved.messages().size(), "Expected persisted USER + PROMPT_REQUIRED messages");
 
         AiChatMessage user = saved.messages().get(0);
         assertEquals("USER", user.role());
         assertEquals("please compile", user.content());
 
         AiChatMessage awaiting = saved.messages().get(1);
-        assertEquals("AWAITING_AUTHORIZATION", awaiting.role());
-        assertTrue(awaiting.content().contains("compileJavaType"));
+        assertEquals("PROMPT_REQUIRED", awaiting.role());
+        UiEventFrame frame = objectMapper.readValue(awaiting.content(), UiEventFrame.class);
+        assertEquals("PROMPT_REQUIRED", frame.type());
+        assertEquals("AUTHORIZE_TOOL", frame.intent());
+        assertEquals("compileJavaType", String.valueOf(frame.payload().get("toolName")));
         assertNotNull(awaiting.toolCalls());
         assertEquals(1, awaiting.toolCalls().size());
 
@@ -70,8 +80,15 @@ class ChatServiceSuspensionPersistenceTest {
         assertEquals("compileJavaType", tool.name());
         assertEquals("{\"source\":\"class Demo {}\"}", tool.arguments());
         assertTrue(tool.id().startsWith("pending-"));
+        assertEquals(tool.id(), String.valueOf(frame.payload().get("toolCallId")));
+
+        @SuppressWarnings("unchecked")
+        List<String> actions = (List<String>) frame.payload().get("actions");
+        assertEquals(List.of("ONCE", "SESSION", "ALWAYS", "DENIED"), actions);
 
         assertNull(awaiting.toolCallId());
         assertNull(awaiting.toolName());
+
+        verify(messaging).convertAndSend(anyString(), any(UiEventFrame.class));
     }
 }

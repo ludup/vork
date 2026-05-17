@@ -83,6 +83,39 @@ body {
     border-bottom-left-radius: 0.3rem;
 }
 
+.bubble.prompt-required {
+    border: 1px solid rgba(13, 110, 253, 0.35);
+    background: linear-gradient(180deg, rgba(13, 110, 253, 0.08), rgba(13, 110, 253, 0.02));
+}
+
+.prompt-title {
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+
+.prompt-meta {
+    font-size: 0.82rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.2rem;
+}
+
+.prompt-args {
+    margin-top: 0.45rem;
+    margin-bottom: 0.45rem;
+    max-height: 180px;
+}
+
+.prompt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+}
+
+.prompt-action-btn {
+    min-width: 84px;
+}
+
 .bubble p:last-child {
     margin-bottom: 0;
 }

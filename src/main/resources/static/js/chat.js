@@ -126,6 +126,160 @@ function renderMessage(msg) {
     scrollBottom();
 }
 
+function isUiEventFrame(obj) {
+    return obj && typeof obj === 'object'
+        && typeof obj.type === 'string'
+        && typeof obj.intent === 'string'
+        && obj.payload && typeof obj.payload === 'object';
+}
+
+function tryParseJson(text) {
+    if (!text || typeof text !== 'string') return null;
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        return null;
+    }
+}
+
+function renderPromptRequiredFrame(frame) {
+    const payload = frame.payload || {};
+    const toolName = payload.toolName || 'unknown-tool';
+    const toolCallId = payload.toolCallId || '';
+    const args = typeof payload.arguments === 'string' ? payload.arguments : JSON.stringify(payload.arguments || {});
+    const actions = Array.isArray(payload.actions) ? payload.actions : [];
+
+    const row = document.createElement('div');
+    row.className = 'message-row';
+    row.innerHTML =
+        '<div class="avatar assistant"><i class="fa-solid fa-robot"></i></div>' +
+        '<div class="bubble assistant prompt-required">' +
+        '  <div class="prompt-title"><i class="fa-solid fa-shield-halved"></i> Authorization Required</div>' +
+        '  <div class="prompt-meta"><strong>Tool:</strong> ' + escapeHtml(toolName) + '</div>' +
+        '  <div class="prompt-meta"><strong>Call ID:</strong> ' + escapeHtml(toolCallId) + '</div>' +
+        '  <pre class="prompt-args">' + escapeHtml(args) + '</pre>' +
+        '  <div class="prompt-actions"></div>' +
+        '</div>';
+
+    const actionsEl = row.querySelector('.prompt-actions');
+    actions.forEach(function (action) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm prompt-action-btn';
+        btn.dataset.action = action;
+        btn.textContent = action;
+
+        if (action === 'DENIED') {
+            btn.classList.add('btn-outline-danger');
+        } else {
+            btn.classList.add('btn-outline-primary');
+        }
+
+        btn.addEventListener('click', function () {
+            sendAuthorizationAction(frame.eventId, action, {});
+            row.querySelectorAll('.prompt-action-btn').forEach(function (b) { b.disabled = true; });
+        });
+        actionsEl.appendChild(btn);
+    });
+
+    messagesArea.insertBefore(row, typingEl);
+    scrollBottom();
+}
+
+function handleIncomingUiFrame(frame) {
+    switch (frame.type) {
+        case 'PROMPT_REQUIRED':
+            renderPromptRequiredFrame(frame);
+            setInputEnabled(true);
+            showTyping(false);
+            return;
+
+        case 'TEXT_RESPONSE':
+            if (frame.payload && frame.payload.message && typeof frame.payload.message === 'object') {
+                renderMessage(frame.payload.message);
+                return;
+            }
+            if (frame.payload && typeof frame.payload.content === 'string') {
+                renderMessage({ role: 'ASSISTANT', content: frame.payload.content });
+                return;
+            }
+            renderMessage({ role: 'ASSISTANT', content: '' });
+            return;
+
+        case 'ERROR':
+            renderMessage({
+                role: 'ERROR',
+                content: (frame.payload && frame.payload.message) ? String(frame.payload.message) : 'Unknown error'
+            });
+            return;
+
+        default:
+            if (frame.payload && frame.payload.message && typeof frame.payload.message === 'object') {
+                renderMessage(frame.payload.message);
+            }
+    }
+}
+
+function renderSessionRecord(msg) {
+    if (msg.role === 'PROMPT_REQUIRED') {
+        const frame = tryParseJson(msg.content);
+        if (frame && isUiEventFrame(frame)) {
+            renderPromptRequiredFrame(frame);
+            return;
+        }
+    }
+
+    if (msg.role === 'TEXT_RESPONSE') {
+        const frame = tryParseJson(msg.content);
+        if (frame && frame.payload && typeof frame.payload.content === 'string') {
+            renderMessage({ role: 'ASSISTANT', content: frame.payload.content });
+            return;
+        }
+    }
+
+    // Hide raw tool payload records from the visible transcript.
+    if (msg.role === 'TOOL') {
+        return;
+    }
+
+    renderMessage(msg);
+}
+
+function sendAuthorizationAction(eventId, action, fields) {
+    if (!sessionUuid) return;
+
+    showTyping(true);
+    setInputEnabled(false);
+
+    fetch('/api/chat/respond/' + sessionUuid, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            eventId: eventId,
+            action: action,
+            fields: fields || {}
+        })
+    })
+        .then(function (resp) {
+            if (!resp.ok) {
+                return resp.text().then(function (body) {
+                    throw new Error(body || ('HTTP ' + resp.status));
+                });
+            }
+            // Response is acknowledged here; rendering is driven by websocket
+            // broadcast to avoid duplicate message rendering.
+            return resp.text();
+        })
+        .then(function () {
+            // Keep waiting state until websocket event arrives.
+        })
+        .catch(function (err) {
+            showTyping(false);
+            setInputEnabled(true);
+            renderMessage({ role: 'ERROR', content: 'Failed to submit authorization response: ' + err.message });
+        });
+}
+
 // ── Lightbox ──────────────────────────────────────────────────────────────────
 
 function openLightbox(src) {
@@ -307,7 +461,11 @@ function connectWebSocket() {
                 const msg = JSON.parse(frame.body);
                 showTyping(false);
                 setInputEnabled(true);
-                renderMessage(msg);
+                if (isUiEventFrame(msg)) {
+                    handleIncomingUiFrame(msg);
+                } else {
+                    renderMessage(msg);
+                }
             });
         },
         onDisconnect: function () { setStatus('disconnected'); },
@@ -327,7 +485,7 @@ function initSession() {
         .then(function (data) {
             sessionUuid = data.sessionUuid;
             sessionDisplay.textContent = sessionUuid.substring(0, 8) + '\u2026';
-            (data.messages || []).forEach(renderMessage);
+            (data.messages || []).forEach(renderSessionRecord);
             connectWebSocket();
             messageInput.focus();
         })
