@@ -113,6 +113,18 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- Thymeleaf: Server-side HTML template engine for login and authorization pages -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         
         <dependency>
         	<groupId>com.sshtools</groupId>

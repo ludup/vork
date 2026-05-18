@@ -1,0 +1,317 @@
+/* ── Vork Custom Bootstrap 5 Dark Theme with #fdaa02 Accent ─────────────────── */
+
+:root {
+    /* Primary accent color */
+    --bs-primary: #fdaa02;
+    --bs-primary-rgb: 253, 170, 2;
+
+    /* Dark mode base colors */
+    --bs-dark: #1a1a1a;
+    --bs-dark-rgb: 26, 26, 26;
+    --bs-body-bg: #0f0f0f;
+    --bs-body-bg-rgb: 15, 15, 15;
+    --bs-body-color: #e9ecef;
+    --bs-body-color-rgb: 233, 236, 239;
+    --bs-border-color: #333333;
+
+    /* Secondary — dark gray accent */
+    --bs-secondary: #6c757d;
+    --bs-secondary-rgb: 108, 117, 125;
+    --bs-secondary-bg: #212529;
+    --bs-secondary-bg-rgb: 33, 37, 41;
+
+    /* Success — vibrant green for dark mode */
+    --bs-success: #51cf66;
+    --bs-success-rgb: 81, 207, 102;
+
+    /* Danger — vibrant red */
+    --bs-danger: #ff6b6b;
+    --bs-danger-rgb: 255, 107, 107;
+
+    /* Warning — bright yellow/orange */
+    --bs-warning: #ffa94d;
+    --bs-warning-rgb: 255, 169, 77;
+
+    /* Info — bright cyan/blue */
+    --bs-info: #4ecdc4;
+    --bs-info-rgb: 78, 205, 196;
+
+    /* Light — light gray for dark mode */
+    --bs-light: #dee2e6;
+    --bs-light-rgb: 222, 226, 230;
+
+    /* Additional dark mode specific overrides */
+    --bs-gray-100: #f8f9fa;
+    --bs-gray-200: #e9ecef;
+    --bs-gray-300: #dee2e6;
+    --bs-gray-400: #adb5bd;
+    --bs-gray-500: #6c757d;
+    --bs-gray-600: #495057;
+    --bs-gray-700: #343a40;
+    --bs-gray-800: #212529;
+    --bs-gray-900: #0f0f0f;
+}
+
+/* ── Bootstrap component overrides for dark mode consistency ─────────────────── */
+
+html[data-bs-theme="dark"] {
+    color-scheme: dark;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #000;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    background-color: #e89a02;
+    border-color: #e89a02;
+    color: #000;
+}
+
+.btn-primary:focus,
+.btn-primary:active {
+    background-color: #cc8601;
+    border-color: #cc8601;
+    color: #000;
+    box-shadow: 0 0 0 0.25rem rgba(253, 170, 2, 0.25);
+}
+
+.btn-primary:disabled {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    opacity: 0.65;
+}
+
+.btn-outline-primary {
+    color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #000;
+}
+
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+    box-shadow: 0 0 0 0.25rem rgba(253, 170, 2, 0.25);
+}
+
+/* Forms */
+.form-control,
+.form-select {
+    background-color: #1a1a1a;
+    border-color: #333333;
+    color: #e9ecef;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: #1a1a1a;
+    border-color: var(--bs-primary);
+    color: #e9ecef;
+    box-shadow: 0 0 0 0.25rem rgba(253, 170, 2, 0.25);
+}
+
+.form-control::placeholder {
+    color: #6c757d;
+    opacity: 0.7;
+}
+
+/* Cards */
+.card {
+    background-color: #1a1a1a;
+    border-color: #333333;
+}
+
+.card-header {
+    background-color: #0f0f0f;
+    border-color: #333333;
+}
+
+.card-footer {
+    background-color: #0f0f0f;
+    border-color: #333333;
+}
+
+/* Alerts */
+.alert-primary {
+    background-color: rgba(253, 170, 2, 0.1);
+    border-color: var(--bs-primary);
+    color: #ffc966;
+}
+
+.alert-success {
+    background-color: rgba(81, 207, 102, 0.1);
+    border-color: var(--bs-success);
+    color: #7ef8a0;
+}
+
+.alert-danger {
+    background-color: rgba(255, 107, 107, 0.1);
+    border-color: var(--bs-danger);
+    color: #ff9999;
+}
+
+.alert-warning {
+    background-color: rgba(255, 169, 77, 0.1);
+    border-color: var(--bs-warning);
+    color: #ffb366;
+}
+
+.alert-info {
+    background-color: rgba(78, 205, 196, 0.1);
+    border-color: var(--bs-info);
+    color: #7ee8e0;
+}
+
+/* Badges */
+.badge {
+    font-weight: 500;
+}
+
+.badge.bg-primary {
+    background-color: var(--bs-primary) !important;
+    color: #000 !important;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+    background-color: #1a1a1a;
+    border-color: #333333;
+}
+
+.dropdown-item {
+    color: #e9ecef;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: #333333;
+    color: var(--bs-primary);
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--bs-primary);
+    color: #000;
+}
+
+/* Modals */
+.modal-content {
+    background-color: #1a1a1a;
+    border-color: #333333;
+}
+
+.modal-header {
+    background-color: #0f0f0f;
+    border-color: #333333;
+}
+
+.modal-footer {
+    background-color: #0f0f0f;
+    border-color: #333333;
+}
+
+/* Navigation */
+.navbar {
+    background-color: #0f0f0f;
+    border-bottom-color: #333333;
+}
+
+.nav-link {
+    color: #e9ecef !important;
+}
+
+.nav-link:hover,
+.nav-link:focus {
+    color: var(--bs-primary) !important;
+}
+
+.nav-link.active {
+    color: var(--bs-primary) !important;
+}
+
+/* Pagination */
+.pagination .page-link {
+    background-color: #1a1a1a;
+    border-color: #333333;
+    color: #e9ecef;
+}
+
+.pagination .page-link:hover {
+    background-color: #333333;
+    border-color: #333333;
+    color: var(--bs-primary);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #000;
+}
+
+/* Tables */
+.table {
+    color: #e9ecef;
+    border-color: #333333;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: rgba(253, 170, 2, 0.1);
+}
+
+.table thead {
+    border-bottom-color: #333333;
+}
+
+/* Progress */
+.progress {
+    background-color: #333333;
+}
+
+.progress-bar {
+    background-color: var(--bs-primary);
+    color: #000;
+}
+
+/* Input groups */
+.input-group-text {
+    background-color: #1a1a1a;
+    border-color: #333333;
+    color: #e9ecef;
+}
+
+/* Links */
+a {
+    color: var(--bs-primary);
+    text-decoration: none;
+}
+
+a:hover {
+    color: #e89a02;
+    text-decoration: underline;
+}
+
+/* Headings in dark mode */
+h1, h2, h3, h4, h5, h6 {
+    color: #e9ecef;
+}
+
+/* Small text */
+.text-muted {
+    color: #6c757d !important;
+}
+
+.text-secondary {
+    color: #6c757d !important;
+}

@@ -2,7 +2,8 @@ package sh.vork.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -12,52 +13,98 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.RememberMeServices;
+import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices;
 
 /**
- * Minimal Spring Security configuration for development.
- *
- * <ul>
- *   <li>Routes under {@code /ui/**} and {@code /api/**} require authentication.</li>
- *   <li>Static assets, the WebSocket endpoint, and everything else are publicly accessible.</li>
- *   <li>Both HTTP Basic and form login are enabled so browser clients and API clients work.</li>
- *   <li>CSRF is disabled — the SPA submits JSON/multipart over fetch, not HTML forms with cookies.</li>
- * </ul>
- *
- * <p><strong>Default credentials (development only):</strong> {@code admin} / {@code password}.
+ * Spring Security configuration for custom login, page protection, and remember-me.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           RememberMeServices rememberMeServices) throws Exception {
         http
-            // Disable CSRF for development — SPA uses Bearer/Basic, not cookie-based CSRF tokens
-            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // Static assets — always public
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/*.html", "/*.ico").permitAll()
-                // WebSocket SockJS handshake
+                .requestMatchers("/login", "/login/**").permitAll()
+                .requestMatchers("/authorize", "/authorize/**").permitAll()
+                .requestMatchers("/api/authorization/**").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/*.ico").permitAll()
                 .requestMatchers("/ws/**").permitAll()
-                // Secured areas
-                .requestMatchers("/ui/**", "/api/**").authenticated()
-                // Everything else (root, health, etc.) is public
-                .anyRequest().permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                .anyRequest().authenticated()
             )
-            // Support both browser form login and programmatic Basic auth
-            .httpBasic(Customizer.withDefaults())
-            .formLogin(Customizer.withDefaults());
+            .formLogin(form -> form
+                .loginPage("/login")
+                .loginProcessingUrl("/login")
+                .usernameParameter("username")
+                .passwordParameter("password")
+                .defaultSuccessUrl("/index.html", true)
+                .failureUrl("/login?error=true")
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/login?logout=true")
+                .deleteCookies("VORK_REMEMBER_ME")
+                .permitAll()
+            )
+            .rememberMe(rememberMe -> rememberMe
+                .rememberMeServices(rememberMeServices)
+                .key("vork-remember-me-key-change-in-production")
+            )
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/authorization/**", "/ws/**")
+            )
+            .sessionManagement(session -> session
+                .sessionConcurrency(concurrency -> concurrency
+                    .maximumSessions(5)
+                    .expiredUrl("/login?expired=true")
+                )
+            );
 
         return http.build();
     }
 
     @Bean
+    public AuthenticationManager authenticationManager(HttpSecurity http,
+                                                       UserDetailsService userDetailsService,
+                                                       PasswordEncoder passwordEncoder) throws Exception {
+        AuthenticationManagerBuilder authenticationManagerBuilder =
+                http.getSharedObject(AuthenticationManagerBuilder.class);
+        authenticationManagerBuilder
+                .userDetailsService(userDetailsService)
+                .passwordEncoder(passwordEncoder);
+        return authenticationManagerBuilder.build();
+    }
+
+    @Bean
+    public RememberMeServices rememberMeServices(UserDetailsService userDetailsService) {
+        TokenBasedRememberMeServices rememberMeServices = new TokenBasedRememberMeServices(
+                "vork-remember-me-key-change-in-production",
+                userDetailsService);
+        rememberMeServices.setTokenValiditySeconds(2_592_000);
+        rememberMeServices.setCookieName("VORK_REMEMBER_ME");
+        rememberMeServices.setUseSecureCookie(false);
+        rememberMeServices.setAlwaysRemember(false);
+        return rememberMeServices;
+    }
+
+    @Bean
     public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
         UserDetails admin = User.withUsername("admin")
-                .password(passwordEncoder.encode("password"))
+            .password(passwordEncoder.encode("admin123"))
                 .roles("ADMIN")
                 .build();
-        return new InMemoryUserDetailsManager(admin);
+
+        UserDetails user = User.withUsername("user")
+            .password(passwordEncoder.encode("user123"))
+            .roles("USER")
+            .build();
+
+        return new InMemoryUserDetailsManager(admin, user);
     }
 
     @Bean

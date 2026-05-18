@@ -9,6 +9,20 @@ spring:
           options:
             model: gemini-2.5-flash
 
+  # Thymeleaf configuration for login and authorization pages
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false
+
+  # Security configuration
+  security:
+    user:
+      name: admin
+      password: admin123
+
 # When adding a second provider, add its block here, e.g.:
 #  openai:
 #    api-key: ${OPENAI_API_KEY:}

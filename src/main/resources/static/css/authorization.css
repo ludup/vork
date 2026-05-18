@@ -1,0 +1,313 @@
+/* Authorization Page Styles */
+
+:root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --bg-dark: #1a1a1a;
+    --bg-card: #2a2a2a;
+    --text-primary: #fff;
+    --text-muted: #a0a0a0;
+    --border-color: #3a3a3a;
+}
+
+body {
+    background: linear-gradient(135deg, var(--bg-dark) 0%, #0f0f0f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+.authorization-container {
+    width: 100%;
+    max-width: 500px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.authorization-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    padding: 40px;
+    backdrop-filter: blur(10px);
+}
+
+.authorization-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 15px;
+    background: rgba(0, 123, 255, 0.2);
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: var(--primary-color);
+    animation: slideDown 0.4s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.authorization-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+
+.authorization-header p {
+    font-size: 14px;
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.action-details {
+    background: rgba(0, 123, 255, 0.1);
+    border: 1px solid rgba(0, 123, 255, 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 25px;
+    animation: slideUp 0.4s ease-out 0.1s backwards;
+}
+
+.action-details h5 {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.action-details p {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin: 8px 0 0 0;
+    line-height: 1.5;
+}
+
+.action-details strong {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.authorization-form {
+    animation: slideUp 0.4s ease-out 0.15s backwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.form-label {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    background: #1a1a1a;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.form-control::placeholder {
+    color: #555;
+}
+
+.form-control:focus {
+    background: #1a1a1a;
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+}
+
+.form-control-lg {
+    padding: 12px 16px;
+    height: auto;
+}
+
+.form-check-input {
+    background-color: #1a1a1a;
+    border: 1px solid var(--border-color);
+    width: 18px;
+    height: 18px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.form-check-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+}
+
+.form-check-label {
+    color: var(--text-primary);
+    font-size: 14px;
+    margin-left: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color) 0%, #1e7e34 100%);
+    border: none;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #1e7e34 0%, #155724 100%);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    transform: translateY(-2px);
+    color: #fff;
+}
+
+.btn-success:active {
+    background: linear-gradient(135deg, #155724 0%, #0c3418 100%);
+    transform: translateY(0);
+}
+
+.btn-outline-danger {
+    color: var(--danger-color);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.btn-outline-danger:hover {
+    background: rgba(220, 53, 69, 0.15);
+    border-color: var(--danger-color);
+    color: #ff6b6b;
+    transform: translateY(-2px);
+}
+
+.btn-outline-danger:active {
+    background: rgba(220, 53, 69, 0.2);
+    transform: translateY(0);
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 14px;
+}
+
+.alert {
+    font-size: 14px;
+    margin-bottom: 20px;
+    border: none;
+    border-radius: 8px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.alert-danger {
+    background: rgba(220, 53, 69, 0.15);
+    color: #ff6b6b;
+    border-left: 3px solid #ff6b6b;
+}
+
+.btn-close {
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+}
+
+.btn-close:hover {
+    opacity: 1;
+}
+
+.authorization-footer {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.authorization-footer p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Loading state */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 575.98px) {
+    .authorization-card {
+        padding: 30px 20px;
+    }
+
+    .authorization-header h1 {
+        font-size: 24px;
+    }
+
+    .header-icon {
+        width: 70px;
+        height: 70px;
+        font-size: 32px;
+    }
+
+    .btn-lg {
+        font-size: 13px;
+        padding: 10px 16px;
+    }
+}
+
+/* Accessibility */
+.form-control:focus-visible,
+.btn-success:focus-visible,
+.btn-outline-danger:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
