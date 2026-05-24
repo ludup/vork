@@ -12,7 +12,10 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
 
+import sh.vork.ai.config.AiConfig;
+import sh.vork.ai.context.ThreadLocalExecutionContext;
 import sh.vork.ai.AiProvider;
+import sh.vork.ai.memory.SessionEnvironmentService;
 
 /**
  * Routes AI generation requests to the appropriate {@link ChatClient} at runtime.
@@ -44,9 +47,12 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
                         """.stripIndent();
 
         private final Map<AiProvider, ChatClient> registry;
+        private final SessionEnvironmentService sessionEnvironmentService;
 
-        public AiOrchestrationService(Map<AiProvider, ChatClient> chatClientRegistry) {
+        public AiOrchestrationService(Map<AiProvider, ChatClient> chatClientRegistry,
+                                                                  SessionEnvironmentService sessionEnvironmentService) {
                 this.registry = chatClientRegistry;
+                this.sessionEnvironmentService = sessionEnvironmentService;
     }
 
     /**
@@ -72,6 +78,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
                 provider, userPrompt.length() > 120 ? userPrompt.substring(0, 120) + "…" : userPrompt);
 
         String response = base.mutate()
+                .defaultSystem(composeSystemPrompt())
                 .build()
                 .prompt()
                 .user(withBackgroundDirective(userPrompt, provider))
@@ -105,6 +112,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
         log.info("Generating chat response [provider={}, history={} msgs]...", provider, conversationHistory.size());
 
         String response = base.mutate()
+                .defaultSystem(composeSystemPrompt())
                 .build()
                 .prompt()
                 .messages(conversationHistory.toArray(Message[]::new))
@@ -151,6 +159,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
         allMessages.add(UserMessage.builder().text(effectiveText).media(media).build());
 
         String response = base.mutate()
+                .defaultSystem(composeSystemPrompt())
                 .build()
                 .prompt()
                 .messages(allMessages.toArray(Message[]::new))
@@ -169,6 +178,22 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
                         return baseText;
                 }
                 return BACKGROUND_OPERATIONAL_PROTOCOL + "\n\n" + baseText;
+        }
+
+        private String composeSystemPrompt() {
+                String sessionUuid = ThreadLocalExecutionContext.getSessionUuid();
+                if (sessionUuid == null || sessionUuid.isBlank()) {
+                        return AiConfig.BASE_SYSTEM_PROMPT;
+                }
+
+                Map<String, String> envMap = sessionEnvironmentService.getEnv(sessionUuid);
+                if (envMap == null || envMap.isEmpty()) {
+                        return AiConfig.BASE_SYSTEM_PROMPT;
+                }
+
+                StringBuilder envBlock = new StringBuilder("\n### ACTIVE SESSION ENVIRONMENT VARIABLES\n");
+                envMap.forEach((k, v) -> envBlock.append(k).append("=").append(v).append("\n"));
+                return AiConfig.BASE_SYSTEM_PROMPT + envBlock;
         }
 
 }

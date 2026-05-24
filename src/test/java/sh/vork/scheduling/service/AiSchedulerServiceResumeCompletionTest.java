@@ -46,6 +46,7 @@ class AiSchedulerServiceResumeCompletionTest {
                 System.currentTimeMillis(),
                 1,
                 List.of(new AiChatMessage("m1", "USER", "prompt", System.currentTimeMillis(), null)),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.RUNNING));
 
         CompletingEngine engine = new CompletingEngine(sessionRepo);
@@ -80,6 +81,7 @@ class AiSchedulerServiceResumeCompletionTest {
                     s.createdAt(),
                     s.currentRoundCount(),
                     s.messages(),
+                    AiSession.defaultEnvironmentVariables(),
                     AiSessionStatus.COMPLETED));
         }
     }

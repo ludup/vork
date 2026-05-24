@@ -56,6 +56,7 @@ class ChatAuthorizationControllerIsolationTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(prompt),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.AWAITING_INPUT));
 
         AuthorizationRuleEngine rules = new AuthorizationRuleEngine(List.of(), null);
@@ -75,7 +76,8 @@ class ChatAuthorizationControllerIsolationTest {
                 schedulerService,
                 null,
                 null,
-                new SecureCredentialStoreService(new SecureCredentialStore()));
+                new SecureCredentialStoreService(new SecureCredentialStore()),
+                null);
 
         ResponseEntity<Map<String, Object>> response = controller.respond(
                 sessionUuid,
@@ -108,6 +110,7 @@ class ChatAuthorizationControllerIsolationTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(prompt),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.AWAITING_INPUT));
 
         AuthorizationRuleEngine rules = new AuthorizationRuleEngine(List.of(), null);
@@ -127,7 +130,8 @@ class ChatAuthorizationControllerIsolationTest {
                 schedulerService,
                 null,
                 null,
-                new SecureCredentialStoreService(new SecureCredentialStore()));
+                new SecureCredentialStoreService(new SecureCredentialStore()),
+                null);
 
         ResponseEntity<Map<String, Object>> response = controller.respond(
                 sessionUuid,
@@ -159,6 +163,7 @@ class ChatAuthorizationControllerIsolationTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(prompt),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.AWAITING_INPUT));
 
         AuthorizationRuleEngine rules = new AuthorizationRuleEngine(List.of(), null);
@@ -178,7 +183,8 @@ class ChatAuthorizationControllerIsolationTest {
                 schedulerService,
                 null,
                 null,
-                new SecureCredentialStoreService(new SecureCredentialStore()));
+                new SecureCredentialStoreService(new SecureCredentialStore()),
+                null);
 
         ResponseEntity<Map<String, Object>> response = controller.authorizeViaLink(
                 sessionUuid,
@@ -217,6 +223,7 @@ class ChatAuthorizationControllerIsolationTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(prompt),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.AWAITING_INPUT));
 
         ChatAuthorizationController controller = new ChatAuthorizationController(
@@ -230,7 +237,8 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStoreService(new SecureCredentialStore()));
+                new SecureCredentialStoreService(new SecureCredentialStore()),
+                null);
 
         ResponseEntity<Map<String, Object>> response = controller.pendingAuthorization(sessionUuid, null);
 
@@ -263,6 +271,7 @@ class ChatAuthorizationControllerIsolationTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(prompt),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.AWAITING_INPUT));
 
         ToolCallback terminalTool = FunctionToolCallback.builder("executeTerminalCommand",
@@ -282,7 +291,8 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStoreService(new SecureCredentialStore()));
+                new SecureCredentialStoreService(new SecureCredentialStore()),
+                null);
 
         controller.respond(sessionUuid,
                 new ChatAuthorizationController.InteractionResponse("evt-terminal", "AUTHORIZE_TOOL", "ONCE", Map.of()));
@@ -344,7 +354,7 @@ class ChatAuthorizationControllerIsolationTest {
         private int generateWithHistoryCalls;
 
         private RecordingAiService(String nextOutput) {
-            super(Map.of());
+            super(Map.of(), null);
             this.nextOutput = nextOutput;
         }
 

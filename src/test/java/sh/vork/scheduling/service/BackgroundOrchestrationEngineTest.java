@@ -45,6 +45,7 @@ class BackgroundOrchestrationEngineTest {
                 System.currentTimeMillis(),
                 10,
                 List.of(),
+            AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.RUNNING));
 
         engine.executeBackgroundTurn(sessionUuid, "initial");
@@ -74,6 +75,7 @@ class BackgroundOrchestrationEngineTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(),
+            AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.RUNNING));
 
         engine.executeBackgroundTurn(sessionUuid, "initial");
@@ -102,6 +104,7 @@ class BackgroundOrchestrationEngineTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(),
+            AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.RUNNING));
 
         engine.executeBackgroundTurn(sessionUuid, "initial");
@@ -130,7 +133,7 @@ class BackgroundOrchestrationEngineTest {
                         Mode mode) {
             super(
                     sessionRepo,
-                    new AiOrchestrationService(Map.of()),
+                    new AiOrchestrationService(Map.of(), null),
                     null,
                     new SimpMessagingTemplate(new NoOpMessageChannel()),
                     new ObjectMapper().findAndRegisterModules(),
@@ -161,6 +164,7 @@ class BackgroundOrchestrationEngineTest {
                         s.createdAt(),
                         s.currentRoundCount(),
                         s.messages(),
+                    AiSession.defaultEnvironmentVariables(),
                         AiSessionStatus.COMPLETED));
                 context.markExecutionComplete();
             }

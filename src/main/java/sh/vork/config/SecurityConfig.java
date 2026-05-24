@@ -28,7 +28,6 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/**").permitAll()
-                .requestMatchers("/authorize", "/authorize/**").permitAll()
                 .requestMatchers("/api/authorization/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/*.ico").permitAll()
                 .requestMatchers("/ws/**").permitAll()
@@ -40,7 +39,7 @@ public class SecurityConfig {
                 .loginProcessingUrl("/login")
                 .usernameParameter("username")
                 .passwordParameter("password")
-                .defaultSuccessUrl("/index.html", true)
+                .defaultSuccessUrl("/index.html", false)
                 .failureUrl("/login?error=true")
                 .permitAll()
             )

@@ -23,7 +23,7 @@
                     <i class="fa-solid fa-lock"></i>
                 </div>
                 <h1>Authorization Required</h1>
-                <p class="text-muted">Verify your identity to approve this action</p>
+                <p class="text-muted">Confirm this action as the currently signed-in user</p>
             </div>
 
             <div class="action-details" id="actionDetails">
@@ -38,42 +38,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
 
-                <!-- Username field -->
-                <div class="mb-3">
-                    <label for="username" class="form-label">
-                        <i class="fa-solid fa-user me-2"></i>Username
-                    </label>
-                    <input type="text" class="form-control form-control-lg" id="username" 
-                           name="username" required autofocus 
-                           placeholder="Enter your username">
-                </div>
-
-                <!-- Password field -->
-                <div class="mb-3">
-                    <label for="password" class="form-label">
-                        <i class="fa-solid fa-lock me-2"></i>Password
-                    </label>
-                    <input type="password" class="form-control form-control-lg" id="password" 
-                           name="password" required 
-                           placeholder="Enter your password">
-                </div>
-
-                <!-- Remember me checkbox -->
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="rememberMe" 
-                           name="remember-me" value="true" checked>
-                    <label class="form-check-label" for="rememberMe">
-                        Remember me for 30 days on this authorization
-                    </label>
-                </div>
-
                 <!-- Hidden authorization token -->
                 <input type="hidden" id="authToken" name="token">
 
                 <!-- Action buttons -->
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-success btn-lg">
-                        <i class="fa-solid fa-check-circle me-2"></i>Approve & Continue
+                        <i class="fa-solid fa-check-circle me-2"></i>Approve
                     </button>
                     <button type="button" class="btn btn-outline-danger btn-lg" id="denyBtn">
                         <i class="fa-solid fa-times-circle me-2"></i>Deny
@@ -84,7 +55,7 @@
             <!-- Footer -->
             <div class="authorization-footer">
                 <p class="text-muted small">
-                    <i class="fa-solid fa-info-circle me-1"></i>Your authentication ensures only authorized actions are performed
+                    <i class="fa-solid fa-info-circle me-1"></i>If your session has expired, you will be asked to log in before you can decide
                 </p>
             </div>
         </div>

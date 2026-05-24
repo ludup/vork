@@ -47,11 +47,12 @@ import sh.vork.ai.protocol.interaction.FieldSource;
 import sh.vork.ai.protocol.interaction.FormAction;
 import sh.vork.ai.protocol.interaction.FormField;
 import sh.vork.ai.protocol.interaction.InteractionFormSchema;
+import sh.vork.ai.context.ThreadLocalExecutionContext;
 import sh.vork.ai.security.AuthorizationRuleEngine;
-import sh.vork.ai.security.ThreadLocalExecutionContext;
 import sh.vork.ai.security.VisualizableTool;
 import sh.vork.ai.service.AiOrchestrationService;
 import sh.vork.ai.service.ChatService;
+import sh.vork.ai.memory.SessionEnvironmentService;
 import sh.vork.scheduling.service.AiSchedulerService;
 import sh.vork.database.DatabaseRepository;
 import sh.vork.scheduling.service.SystemBackgroundAuthentication;
@@ -82,6 +83,7 @@ public class ChatAuthorizationController {
     private final FileStorageService fileStorageService;
     private final ChatService chatService;
     private final SecureCredentialStoreService secureCredentialStoreService;
+    private final SessionEnvironmentService sessionEnvironmentService;
 
     @Autowired
     public ChatAuthorizationController(DatabaseRepository<AiSession> sessionRepo,
@@ -94,7 +96,8 @@ public class ChatAuthorizationController {
                                        AiSchedulerService aiSchedulerService,
                                        FileStorageService fileStorageService,
                                        ChatService chatService,
-                                       SecureCredentialStoreService secureCredentialStoreService) {
+                                       SecureCredentialStoreService secureCredentialStoreService,
+                                       SessionEnvironmentService sessionEnvironmentService) {
         this.sessionRepo = sessionRepo;
         this.authorizationRuleEngine = authorizationRuleEngine;
         this.aiService = aiService;
@@ -105,6 +108,7 @@ public class ChatAuthorizationController {
         this.aiSchedulerService = aiSchedulerService;
         this.chatService = chatService;
         this.secureCredentialStoreService = secureCredentialStoreService;
+        this.sessionEnvironmentService = sessionEnvironmentService;
         this.toolCallbacksByName = toolCallbacks.stream().collect(
                 java.util.stream.Collectors.toMap(
                         t -> t.getToolDefinition().name(),
@@ -157,7 +161,10 @@ public class ChatAuthorizationController {
                             secureCredentialStoreService.saveSecret(toPrincipalUser(username), key, value);
                         }
                     }
-                    case CONTEXT -> ThreadLocalExecutionContext.put(key, value);
+                    case CONTEXT -> {
+                        sessionEnvironmentService.setEnv(sessionUuid, key, value);
+                        ThreadLocalExecutionContext.put(key, value);
+                    }
                     case CONVERSATION -> conversationFields.put(key, value);
                 }
             }
@@ -253,9 +260,11 @@ public class ChatAuthorizationController {
                         session.createdAt(),
                     session.currentRoundCount(),
                         List.copyOf(updated),
+                    session.environmentVariables(),
                     AiSessionStatus.RUNNING));
 
                 aiBackgroundExecutor.execute(() -> {
+                    ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
                     try {
                         SecurityContextHolder.getContext()
                                 .setAuthentication(new SystemBackgroundAuthentication(session.username()));
@@ -264,8 +273,11 @@ public class ChatAuthorizationController {
                         log.error("Background resume failed [session={}]: {}", sessionUuid, ex.getMessage(), ex);
                     } finally {
                         SecurityContextHolder.clearContext();
+                        ThreadLocalExecutionContext.clear();
                     }
                 });
+
+                    ThreadLocalExecutionContext.clear();
 
                 return ResponseEntity.ok(Map.of(
                         "status", "BACKGROUND_RESUMED",
@@ -275,6 +287,7 @@ public class ChatAuthorizationController {
 
             log.info("Resuming model call [historyMessages={}]", history.size());
             String finalText;
+            ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
             try {
                 finalText = aiService.generateWithHistory(history, "Please continue based on the tool response.",
                         resolveProvider(session.provider()));
@@ -314,10 +327,13 @@ public class ChatAuthorizationController {
                     session.createdAt(),
                     session.currentRoundCount(),
                     List.copyOf(updated),
+                    session.environmentVariables(),
                     AiSessionStatus.AWAITING_INPUT));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
                 log.info("Resumed call suspended again [tool={}, session={}]", ex.getToolName(), sessionUuid);
+
+                ThreadLocalExecutionContext.clear();
 
                 return ResponseEntity.ok(Map.of(
                     "status", "AWAITING_INPUT",
@@ -353,6 +369,7 @@ public class ChatAuthorizationController {
                     session.createdAt(),
                     session.currentRoundCount(),
                     List.copyOf(updated),
+                    session.environmentVariables(),
                     AiSessionStatus.RUNNING));
 
             if (chatService != null) {
@@ -363,6 +380,9 @@ public class ChatAuthorizationController {
             log.debug("Resumption final text: {}", abbreviate(finalText == null ? "" : finalText, 4000));
 
             messaging.convertAndSend("/topic/chat/" + sessionUuid, textEvent);
+
+            ThreadLocalExecutionContext.clear();
+
             return ResponseEntity.ok(Map.of(
                     "status", "WEB_RESUMED",
                     "eventType", textEvent.type(),

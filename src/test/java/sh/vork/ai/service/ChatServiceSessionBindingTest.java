@@ -68,6 +68,7 @@ class ChatServiceSessionBindingTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.RUNNING));
 
         SecurityContextHolder.getContext().setAuthentication(

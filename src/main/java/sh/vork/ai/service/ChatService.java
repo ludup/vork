@@ -32,6 +32,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import sh.vork.ai.AiProvider;
+import sh.vork.ai.context.ThreadLocalExecutionContext;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiChatMessage.AttachmentRef;
 import sh.vork.ai.entity.AiChatMessage.ToolCallRef;
@@ -72,21 +73,21 @@ public class ChatService {
     private final Executor                      aiBackgroundExecutor;
 
     private static final String DEFAULT_SESSION_NAME = "Untitled";
-  
+
     @Autowired
     public ChatService(DatabaseRepository<AiSession> aiSessionRepository,
                        AiOrchestrationService aiOrchestrationService,
                        FileStorageService fileStorageService,
                        SimpMessagingTemplate messaging,
                        ObjectMapper objectMapper,
-                   List<ToolCallback> toolCallbacks,
+                       List<ToolCallback> toolCallbacks,
                        SystemNotificationService systemNotificationService,
                        @Qualifier("aiBackgroundExecutor") Executor aiBackgroundExecutor) {
-        this.sessionRepo         = aiSessionRepository;
-        this.aiService           = aiOrchestrationService;
-        this.fileStorageService  = fileStorageService;
-        this.messaging           = messaging;
-        this.objectMapper        = objectMapper;
+        this.sessionRepo = aiSessionRepository;
+        this.aiService = aiOrchestrationService;
+        this.fileStorageService = fileStorageService;
+        this.messaging = messaging;
+        this.objectMapper = objectMapper;
         this.systemNotificationService = systemNotificationService;
         this.aiBackgroundExecutor = aiBackgroundExecutor;
     }
@@ -113,7 +114,8 @@ public class ChatService {
 
         String username = resolveUsername();
         AiSession session = new AiSession(httpSessionId, provider.name(), SessionOriginMode.WEB,
-            username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(), AiSessionStatus.RUNNING);
+            username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(),
+            AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING);
         sessionRepo.save(session);
         log.info("Created HTTP session-bound AI session [id={}, provider={}, user={}]",
             httpSessionId, provider, username);
@@ -124,7 +126,8 @@ public class ChatService {
         String username = resolveUsername();
         String uuid = UUID.randomUUID().toString();
         AiSession session = new AiSession(uuid, provider.name(), SessionOriginMode.WEB,
-            username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(), AiSessionStatus.RUNNING);
+            username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(),
+            AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING);
         sessionRepo.save(session);
         log.info("Created AI session [id={}, provider={}, user={}]", uuid, provider, username);
         return session;
@@ -170,6 +173,7 @@ public class ChatService {
                 session.createdAt(),
                 session.currentRoundCount(),
                 session.messages(),
+            AiSession.defaultEnvironmentVariables(),
                 session.status());
         sessionRepo.save(renamed);
         return renamed;
@@ -292,6 +296,7 @@ public class ChatService {
                     session.createdAt(),
                     session.currentRoundCount(),
                     List.copyOf(updated),
+                    session.environmentVariables(),
                     persistedStatus));
 
             maybeGenerateSessionName(session.uuid());
@@ -345,7 +350,8 @@ public class ChatService {
             updated.add(userMsg);
             updated.add(awaiting);
                 sessionRepo.save(new AiSession(session.uuid(), session.provider(), session.originMode(), session.username(),
-                    session.name(), session.createdAt(), session.currentRoundCount(), List.copyOf(updated), AiSessionStatus.AWAITING_INPUT));
+                    session.name(), session.createdAt(), session.currentRoundCount(), List.copyOf(updated),
+                    session.environmentVariables(), AiSessionStatus.AWAITING_INPUT));
 
                 if (provider == AiProvider.BACKGROUND_SCHEDULER) {
                 systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
@@ -393,149 +399,162 @@ public class ChatService {
     private AiChatMessage sendMessageWithSession(AiSession session, String content,
                                                   List<String> attachmentUuids, AiProvider provider) {
         String sessionUuid = session.uuid();
-        
-        // Build Spring AI message list from stored history
-        List<Message> history = hydrateHistory(session.messages());
-
-        log.info("Chat turn [session={}, history={} msgs, attachments={}, provider={}]",
-                sessionUuid, history.size(),
-                attachmentUuids == null ? 0 : attachmentUuids.size(), provider);
-
-        // Resolve attachments
-        List<AttachmentRef> refs      = new ArrayList<>();
-        List<Media>         media     = new ArrayList<>();
-        List<String>        textParts = new ArrayList<>();
-
-        if (attachmentUuids != null) {
-            for (String fileUuid : attachmentUuids) {
-                StoredFile meta = fileStorageService.getMetadata(fileUuid);
-                if (meta == null) {
-                    log.warn("Attachment not found, skipping [uuid={}]", fileUuid);
-                    continue;
-                }
-                refs.add(new AttachmentRef(meta.uuid(), meta.originalName(), meta.mimeType()));
-
-                String mime = meta.mimeType().toLowerCase();
-                if (mime.startsWith("text/")) {
-                    try (InputStream in = fileStorageService.getContent(fileUuid)) {
-                        String text = new String(in.readAllBytes());
-                        textParts.add("[Attached file: " + meta.originalName() + "]\n" + text);
-                    } catch (IOException ex) {
-                        log.error("Failed to read text attachment [uuid={}]: {}", fileUuid, ex.getMessage());
-                    }
-                } else if (FileStorageService.isAiSupported(mime)) {
-                    try (InputStream in = fileStorageService.getContent(fileUuid)) {
-                        byte[] bytes = in.readAllBytes();
-                        media.add(new Media(MimeType.valueOf(meta.mimeType()), new ByteArrayResource(bytes)));
-                    } catch (IOException ex) {
-                        log.error("Failed to read media attachment [uuid={}]: {}", fileUuid, ex.getMessage());
-                    }
-                }
-            }
-        }
-
-        // Build effective content
-        String effectiveContent = content == null ? "" : content;
-        if (!textParts.isEmpty()) {
-            effectiveContent = String.join("\n\n", textParts)
-                    + (effectiveContent.isBlank() ? "" : "\n\n" + effectiveContent);
-        }
-
-        long now = System.currentTimeMillis();
-        List<AttachmentRef> userRefs = refs.isEmpty() ? null : Collections.unmodifiableList(refs);
-        AiChatMessage userMsg = new AiChatMessage(UUID.randomUUID().toString(), "USER",
-                content == null ? "" : content, now, userRefs);
-
+        ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
         try {
-            String aiContent;
-            if (media.isEmpty()) {
-                aiContent = safeGenerateWithHistory(history, effectiveContent, provider);
-            } else {
-                aiContent = safeGenerateWithHistoryAndMedia(history, effectiveContent, media, provider);
+            List<Message> history = hydrateHistory(session.messages());
+
+            log.info("Chat turn [session={}, history={} msgs, attachments={}, provider={}]",
+                    sessionUuid, history.size(),
+                    attachmentUuids == null ? 0 : attachmentUuids.size(), provider);
+
+            List<AttachmentRef> refs = new ArrayList<>();
+            List<Media> media = new ArrayList<>();
+            List<String> textParts = new ArrayList<>();
+
+            if (attachmentUuids != null) {
+                for (String fileUuid : attachmentUuids) {
+                    StoredFile meta = fileStorageService.getMetadata(fileUuid);
+                    if (meta == null) {
+                        continue;
+                    }
+                    refs.add(new AttachmentRef(meta.uuid(), meta.originalName(), meta.mimeType()));
+
+                    String mime = meta.mimeType().toLowerCase();
+                    if (mime.startsWith("text/")) {
+                        try (InputStream in = fileStorageService.getContent(fileUuid)) {
+                            String text = new String(in.readAllBytes());
+                            textParts.add("[Attached file: " + meta.originalName() + "]\n" + text);
+                        } catch (IOException ex) {
+                            log.error("Failed to read text attachment [uuid={}]: {}", fileUuid, ex.getMessage());
+                        }
+                    } else if (FileStorageService.isAiSupported(mime)) {
+                        try (InputStream in = fileStorageService.getContent(fileUuid)) {
+                            byte[] bytes = in.readAllBytes();
+                            media.add(new Media(MimeType.valueOf(meta.mimeType()), new ByteArrayResource(bytes)));
+                        } catch (IOException ex) {
+                            log.error("Failed to read media attachment [uuid={}]: {}", fileUuid, ex.getMessage());
+                        }
+                    } else {
+                        log.info("Attachment MIME type not AI-supported, skipping [uuid={}, mime={}]",
+                                fileUuid, meta.mimeType());
+                    }
+                }
             }
 
-            AiChatMessage aiMsg = new AiChatMessage(UUID.randomUUID().toString(), "ASSISTANT",
-                    aiContent == null ? "" : aiContent, System.currentTimeMillis(),
-                    refs.isEmpty() ? null : Collections.unmodifiableList(refs));
-
-            List<AiChatMessage> updated = new ArrayList<>(session.messages());
-            updated.add(userMsg);
-            updated.add(aiMsg);
-
-            AiSessionStatus persistedStatus = resolveStatusForReplyPersistence(sessionUuid, AiSessionStatus.RUNNING);
-            sessionRepo.save(new AiSession(
-                session.uuid(),
-                session.provider(),
-                session.originMode(),
-                session.username(),
-                session.name(),
-                session.createdAt(),
-                session.currentRoundCount(),
-                List.copyOf(updated),
-                persistedStatus));
-
-            maybeGenerateSessionName(session.uuid());
-
-            log.info("Persisted chat turn [session={}, totalMessages={}]", sessionUuid, updated.size());
-            return aiMsg;
-        } catch (ToolSuspensionException ex) {
-            String simulatedToolCallId = "pending-" + UUID.randomUUID();
-            List<ToolCallRef> pendingToolCalls = List.of(
-                    new ToolCallRef(simulatedToolCallId, "FUNCTION", ex.getToolName(), ex.getArguments()));
-
-            String justification = ex.getJustification();
-            if (justification == null || justification.isBlank()) {
-                justification = defaultAuthorizationReason(ex.getToolName());
+            String effectiveContent = content == null ? "" : content;
+            if (!textParts.isEmpty()) {
+                effectiveContent = String.join("\n\n", textParts)
+                        + (effectiveContent.isBlank() ? "" : "\n\n" + effectiveContent);
             }
 
-            String eventId = UUID.randomUUID().toString();
-            UiEventFrame promptEvent = new UiEventFrame(
-                eventId,
-                "PROMPT_REQUIRED",
-                "AUTHORIZE_TOOL",
-                justification,
-                ex.getFormSchema());
+            long now = System.currentTimeMillis();
+            List<AttachmentRef> userRefs = refs.isEmpty() ? null : Collections.unmodifiableList(refs);
+            AiChatMessage userMsg = new AiChatMessage(UUID.randomUUID().toString(), "USER",
+                    content == null ? "" : content, now, userRefs);
 
-            String promptJson;
             try {
-            promptJson = objectMapper.writeValueAsString(promptEvent);
-            } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize suspension event", e);
-            }
+                String aiContent;
+                if (media.isEmpty()) {
+                    aiContent = safeGenerateWithHistory(history, effectiveContent, provider);
+                } else {
+                    aiContent = safeGenerateWithHistoryAndMedia(history, effectiveContent, media, provider);
+                }
+
+                AiChatMessage aiMsg = new AiChatMessage(UUID.randomUUID().toString(), "ASSISTANT",
+                        aiContent == null ? "" : aiContent, System.currentTimeMillis(),
+                        refs.isEmpty() ? null : Collections.unmodifiableList(refs));
+
+                List<AiChatMessage> updated = new ArrayList<>(session.messages());
+                updated.add(userMsg);
+                updated.add(aiMsg);
+
+                AiSessionStatus persistedStatus = resolveStatusForReplyPersistence(sessionUuid, AiSessionStatus.RUNNING);
+                sessionRepo.save(new AiSession(
+                        session.uuid(),
+                        session.provider(),
+                        session.originMode(),
+                        session.username(),
+                        session.name(),
+                        session.createdAt(),
+                        session.currentRoundCount(),
+                        List.copyOf(updated),
+                        session.environmentVariables(),
+                        persistedStatus));
+
+                maybeGenerateSessionName(session.uuid());
+
+                log.info("Persisted chat turn [session={}, totalMessages={}]", sessionUuid, updated.size());
+                return aiMsg;
+            } catch (ToolSuspensionException ex) {
+                String simulatedToolCallId = "pending-" + UUID.randomUUID();
+                List<ToolCallRef> pendingToolCalls = List.of(
+                        new ToolCallRef(simulatedToolCallId, "FUNCTION", ex.getToolName(), ex.getArguments()));
+
+                String justification = ex.getJustification();
+                if (justification == null || justification.isBlank()) {
+                    justification = defaultAuthorizationReason(ex.getToolName());
+                }
+
+                String eventId = UUID.randomUUID().toString();
+                UiEventFrame promptEvent = new UiEventFrame(
+                        eventId,
+                        "PROMPT_REQUIRED",
+                        "AUTHORIZE_TOOL",
+                        justification,
+                        ex.getFormSchema());
+
+                String promptJson;
+                try {
+                    promptJson = objectMapper.writeValueAsString(promptEvent);
+                } catch (JsonProcessingException e) {
+                    throw new IllegalStateException("Failed to serialize suspension event", e);
+                }
 
                 try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid);
-                 MDC.MDCCloseable eid = MDC.putCloseable("eventId", eventId)) {
-                log.info("Prompt required event created [tool={}, toolCallId={}]",
-                    ex.getToolName(), simulatedToolCallId);
-                log.debug("Prompt required event payload: {}",
-                    promptJson.length() > 4000 ? promptJson.substring(0, 4000) + "...<truncated>" : promptJson);
+                     MDC.MDCCloseable eid = MDC.putCloseable("eventId", eventId)) {
+                    log.info("Prompt required event created [tool={}, toolCallId={}]",
+                            ex.getToolName(), simulatedToolCallId);
+                    log.debug("Prompt required event payload: {}",
+                            promptJson.length() > 4000 ? promptJson.substring(0, 4000) + "...<truncated>" : promptJson);
                 }
 
-            AiChatMessage awaiting = new AiChatMessage(
-                    UUID.randomUUID().toString(),
-                "PROMPT_REQUIRED",
-                promptJson,
-                    System.currentTimeMillis(),
-                    refs.isEmpty() ? null : Collections.unmodifiableList(refs),
-                    pendingToolCalls,
-                    simulatedToolCallId,
-                    ex.getToolName());
+                AiChatMessage awaiting = new AiChatMessage(
+                        UUID.randomUUID().toString(),
+                        "PROMPT_REQUIRED",
+                        promptJson,
+                        System.currentTimeMillis(),
+                        refs.isEmpty() ? null : Collections.unmodifiableList(refs),
+                        pendingToolCalls,
+                        simulatedToolCallId,
+                        ex.getToolName());
 
-            List<AiChatMessage> updated = new ArrayList<>(session.messages());
-            updated.add(userMsg);
-            updated.add(awaiting);
-                sessionRepo.save(new AiSession(session.uuid(), session.provider(), session.originMode(), session.username(),
-                    session.name(), session.createdAt(), session.currentRoundCount(), List.copyOf(updated), AiSessionStatus.AWAITING_INPUT));
+                List<AiChatMessage> updated = new ArrayList<>(session.messages());
+                updated.add(userMsg);
+                updated.add(awaiting);
+                sessionRepo.save(new AiSession(
+                        session.uuid(),
+                        session.provider(),
+                        session.originMode(),
+                        session.username(),
+                        session.name(),
+                        session.createdAt(),
+                        session.currentRoundCount(),
+                        List.copyOf(updated),
+                        session.environmentVariables(),
+                        AiSessionStatus.AWAITING_INPUT));
 
                 if (provider == AiProvider.BACKGROUND_SCHEDULER) {
-                systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
+                    systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
                 }
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, promptEvent);
 
-            log.info("Tool suspension caught for tool: {}. Frozen session state [session={}]",
-                    ex.getToolName(), sessionUuid);
-            return null;
+                log.info("Tool suspension caught for tool: {}. Frozen session state [session={}]",
+                        ex.getToolName(), sessionUuid);
+                return null;
+            }
+        } finally {
+            ThreadLocalExecutionContext.clear();
         }
     }
 
@@ -613,9 +632,10 @@ public class ChatService {
                 session.username(),
                 session.name(),
                 session.createdAt(),
-            session.currentRoundCount(),
+                session.currentRoundCount(),
                 List.copyOf(updated),
-            persistedStatus));
+                session.environmentVariables(),
+                persistedStatus));
 
         maybeGenerateSessionName(session.uuid());
     }
@@ -744,6 +764,7 @@ public class ChatService {
                     latest.createdAt(),
                     latest.currentRoundCount(),
                     latest.messages(),
+                    latest.environmentVariables(),
                     latest.status()));
             log.info("Session title generated [session={}, title={}]", sessionUuid, sanitized);
         } catch (Exception ex) {

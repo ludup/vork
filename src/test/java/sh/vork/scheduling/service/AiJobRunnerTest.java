@@ -56,6 +56,7 @@ class AiJobRunnerTest {
             Instant.now().toEpochMilli(),
             0,
             java.util.List.of(),
+            AiSession.defaultEnvironmentVariables(),
             AiSessionStatus.COMPLETED));
 
         AiJobRunner runner = new AiJobRunner(job, orchestrationEngine, repo, sessionRepo);

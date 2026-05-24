@@ -3,6 +3,8 @@ package sh.vork.ai.entity;
 import sh.vork.database.DatabaseEntity;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * An AI chat session tied to an HTTP session.
@@ -20,6 +22,7 @@ import java.util.List;
  * @param createdAt epoch-milliseconds when the session was created
  * @param currentRoundCount number of autonomous background rounds already executed
  * @param messages  ordered list of conversation turns
+ * @param environmentVariables live session environment variables for the active session
  * @param status    lifecycle state enum for autonomous/background execution tracking
  */
 public record AiSession(
@@ -31,6 +34,7 @@ public record AiSession(
         long                createdAt,
     int                 currentRoundCount,
         List<AiChatMessage> messages,
+        Map<String, String> environmentVariables,
     AiSessionStatus     status
 ) implements DatabaseEntity {
 
@@ -47,8 +51,17 @@ public record AiSession(
         if (messages == null) {
             messages = List.of();
         }
+        if (environmentVariables == null) {
+            environmentVariables = defaultEnvironmentVariables();
+        } else {
+            environmentVariables = new ConcurrentHashMap<>(environmentVariables);
+        }
         if (status == null) {
             status = AiSessionStatus.RUNNING;
         }
+    }
+
+    public static ConcurrentHashMap<String, String> defaultEnvironmentVariables() {
+        return new ConcurrentHashMap<>();
     }
 }

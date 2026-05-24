@@ -2,10 +2,8 @@ package sh.vork.security.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import sh.vork.security.AuthorizationRequest;
 import sh.vork.security.AuthorizationTokenService;
@@ -26,12 +24,9 @@ import java.util.Map;
 public class AuthorizationController {
 
     private final AuthorizationTokenService authorizationTokenService;
-    private final AuthenticationManager authenticationManager;
 
-    public AuthorizationController(AuthorizationTokenService authorizationTokenService,
-                                  AuthenticationManager authenticationManager) {
+    public AuthorizationController(AuthorizationTokenService authorizationTokenService) {
         this.authorizationTokenService = authorizationTokenService;
-        this.authenticationManager = authenticationManager;
     }
 
     /**
@@ -67,23 +62,26 @@ public class AuthorizationController {
     }
 
     /**
-     * Approve an authorization request with credential verification.
+         * Approve an authorization request for the currently authenticated user.
      * 
      * Request body:
      * {
      *   "token": "...",
-     *   "username": "...",
-     *   "password": "...",
-     *   "rememberMe": true/false
      * }
      * 
      * @return Approval response with redirect URL
      */
     @PostMapping("/approve")
     public ResponseEntity<?> approveAuthorization(@RequestBody ApprovalRequest approvalRequest) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Authentication required before approval"));
+        }
+
         // Validate token
         AuthorizationRequest request = authorizationTokenService.getAuthorizationRequest(
-                approvalRequest.token);
+            approvalRequest.getToken());
         
         if (request == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -95,28 +93,10 @@ public class AuthorizationController {
                     .body(Map.of("error", "Authorization token has expired"));
         }
 
-        // Verify credentials
-        try {
-            UsernamePasswordAuthenticationToken authRequest = 
-                    new UsernamePasswordAuthenticationToken(
-                            approvalRequest.username,
-                            approvalRequest.password);
-            
-            Authentication auth = authenticationManager.authenticate(authRequest);
-            
-            if (!auth.isAuthenticated()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Invalid credentials"));
-            }
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid username or password"));
-        }
-
         // Approve the authorization
         authorizationTokenService.approveAuthorization(
-                approvalRequest.token,
-                approvalRequest.username);
+            approvalRequest.getToken(),
+            auth.getName());
 
         // Return success response
         Map<String, Object> response = new HashMap<>();
@@ -139,9 +119,15 @@ public class AuthorizationController {
      */
     @PostMapping("/deny")
     public ResponseEntity<?> denyAuthorization(@RequestBody DenialRequest denialRequest) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Authentication required before denial"));
+        }
+
         // Validate token
         AuthorizationRequest request = authorizationTokenService.getAuthorizationRequest(
-                denialRequest.token);
+            denialRequest.getToken());
         
         if (request == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -153,8 +139,8 @@ public class AuthorizationController {
                     .body(Map.of("error", "Authorization token has expired"));
         }
 
-        // Deny the authorization (mark as denied by "anonymous" user - no login required for deny)
-        authorizationTokenService.denyAuthorization(denialRequest.token, "denied");
+        // Deny the authorization as the authenticated user.
+        authorizationTokenService.denyAuthorization(denialRequest.getToken(), auth.getName());
 
         // Return success response
         Map<String, String> response = new HashMap<>();
@@ -167,30 +153,19 @@ public class AuthorizationController {
     /**
      * Request body for approval endpoint
      */
-    @SuppressWarnings("unused")
     public static class ApprovalRequest {
         public String token;
-        public String username;
-        public String password;
-        public boolean rememberMe;
 
         // Getters for Jackson
         public String getToken() { return token; }
-        public String getUsername() { return username; }
-        public String getPassword() { return password; }
-        public boolean isRememberMe() { return rememberMe; }
 
         // Setters for Jackson
         public void setToken(String token) { this.token = token; }
-        public void setUsername(String username) { this.username = username; }
-        public void setPassword(String password) { this.password = password; }
-        public void setRememberMe(boolean rememberMe) { this.rememberMe = rememberMe; }
     }
 
     /**
      * Request body for denial endpoint
      */
-    @SuppressWarnings("unused")
     public static class DenialRequest {
         public String token;
 

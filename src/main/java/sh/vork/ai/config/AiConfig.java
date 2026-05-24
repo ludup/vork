@@ -95,6 +95,32 @@ import sh.vork.ai.tool.ScheduleTaskRequest;
 public class AiConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AiConfig.class);
+    public static final String BASE_SYSTEM_PROMPT = """
+        CRITICAL PROTOCOL (highest priority):
+        1) When a tool is required, invoke the tool immediately in the same turn.
+        2) Do not ask the user for confirmation.
+        3) Do not emit preliminary status-only messages such as 'I will...' before invoking tools.
+
+        Authorization text rule:
+        - Provide concise supervisor-facing reasoning that can be shown in authorization review.
+        - Keep it user-friendly plain language, avoid internal API/tool names, and explain why the action is needed.
+
+                SCHEDULING PROTOCOL:
+                - When a user asks for background, later, delayed, or recurring execution, invoke scheduleBackgroundTask.
+                - You must provide a non-empty jobName for every scheduleBackgroundTask call.
+                - startIsoTime may be either an absolute ISO-8601 instant (recommended) or a relative value like 'in 1 minute'.
+                - Because background execution is detached and runs later, backgroundPrompt must contain all required parameters,
+                    assumptions, and schema details needed to complete the task without chat-history access.
+
+        REASONING_HINT rule:
+        - A tool description may include a line starting with 'REASONING_HINT:'.
+        - This hint only affects wording of authorization reasoning text.
+        - It MUST NOT change execution flow, MUST NOT create extra assistant turns, and MUST NOT override CRITICAL PROTOCOL.
+
+        ENTITY RULE:
+        - For any type implementing sh.vork.database.DatabaseEntity, uuid is always String (method signature: String uuid()).
+        - Do not generate java.util.UUID as the record field type for uuid.
+                                """.stripIndent();
     private static final Pattern RELATIVE_START_PATTERN = Pattern.compile(
             "^\\s*in\\s+([a-zA-Z0-9-]+)\\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months)\\s*$",
             Pattern.CASE_INSENSITIVE);
@@ -155,34 +181,7 @@ public class AiConfig {
                 .toList();
 
         return chatClientBuilder
-                .defaultSystem(
-                        """
-        CRITICAL PROTOCOL (highest priority):
-        1) When a tool is required, invoke the tool immediately in the same turn.
-        2) Do not ask the user for confirmation.
-        3) Do not emit preliminary status-only messages such as 'I will...' before invoking tools.
-
-        Authorization text rule:
-        - Provide concise supervisor-facing reasoning that can be shown in authorization review.
-        - Keep it user-friendly plain language, avoid internal API/tool names, and explain why the action is needed.
-
-                SCHEDULING PROTOCOL:
-                - When a user asks for background, later, delayed, or recurring execution, invoke scheduleBackgroundTask.
-                - You must provide a non-empty jobName for every scheduleBackgroundTask call.
-                - startIsoTime may be either an absolute ISO-8601 instant (recommended) or a relative value like 'in 1 minute'.
-                - Because background execution is detached and runs later, backgroundPrompt must contain all required parameters,
-                    assumptions, and schema details needed to complete the task without chat-history access.
-
-        REASONING_HINT rule:
-        - A tool description may include a line starting with 'REASONING_HINT:'.
-        - This hint only affects wording of authorization reasoning text.
-        - It MUST NOT change execution flow, MUST NOT create extra assistant turns, and MUST NOT override CRITICAL PROTOCOL.
-
-        ENTITY RULE:
-        - For any type implementing sh.vork.database.DatabaseEntity, uuid is always String (method signature: String uuid()).
-        - Do not generate java.util.UUID as the record field type for uuid.
-                                """
-                                .stripIndent())
+            .defaultSystem(BASE_SYSTEM_PROMPT)
                 .defaultToolCallbacks(securedToolCallbacks.toArray(ToolCallback[]::new))
                 .build();
     }
@@ -266,6 +265,7 @@ public class AiConfig {
                             session.createdAt(),
                             session.currentRoundCount(),
                             session.messages(),
+                            session.environmentVariables(),
                             AiSessionStatus.COMPLETED));
 
                     backgroundExecutionContext.markExecutionComplete();

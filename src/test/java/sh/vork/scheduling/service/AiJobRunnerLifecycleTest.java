@@ -106,6 +106,7 @@ class AiJobRunnerLifecycleTest {
                     current.createdAt(),
                     current.currentRoundCount(),
                     withSyntheticAssistantMessage(current.messages()),
+                    AiSession.defaultEnvironmentVariables(),
                     targetStatus));
         }
 

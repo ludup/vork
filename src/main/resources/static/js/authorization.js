@@ -88,18 +88,10 @@ function displayActionDetails(data) {
 }
 
 /**
- * Submit authorization with credentials
+ * Submit authorization decision as the currently authenticated user
  */
 function submitAuthorization() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const rememberMe = document.getElementById('rememberMe').checked;
     const token = document.getElementById('authToken').value;
-    
-    if (!username || !password) {
-        showError('Please enter your username and password');
-        return;
-    }
     
     const submitBtn = document.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
@@ -114,15 +106,13 @@ function submitAuthorization() {
         },
         credentials: 'include',
         body: JSON.stringify({
-            token: token,
-            username: username,
-            password: password,
-            rememberMe: rememberMe
+            token: token
         })
     })
     .then(response => {
         if (response.status === 401) {
-            throw new Error('Invalid username or password');
+            redirectToLogin();
+            throw new Error('Authentication required');
         }
         if (response.status === 404) {
             throw new Error('Authorization token not found or expired');
@@ -174,6 +164,10 @@ function denyAuthorization() {
         })
     })
     .then(response => {
+        if (response.status === 401) {
+            redirectToLogin();
+            throw new Error('Authentication required');
+        }
         if (!response.ok) {
             throw new Error('Failed to deny authorization');
         }
@@ -215,4 +209,8 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+function redirectToLogin() {
+    window.location.href = window.location.pathname + window.location.search;
 }

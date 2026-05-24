@@ -36,6 +36,7 @@ class AbstractTerminalToolTest {
                 System.currentTimeMillis(),
                 0,
                 List.of(new AiChatMessage("m1", "USER", "hello", System.currentTimeMillis(), null)),
+                AiSession.defaultEnvironmentVariables(),
                 AiSessionStatus.RUNNING));
 
         RecordingRouter router = new RecordingRouter();

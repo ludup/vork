@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
+import sh.vork.ai.context.ThreadLocalExecutionContext;
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiSession;
@@ -65,6 +66,7 @@ public class BackgroundOrchestrationEngine {
                             session.createdAt(),
                             session.currentRoundCount(),
                             List.copyOf(updated),
+                            session.environmentVariables(),
                             AiSessionStatus.FAILED_MAX_ROUNDS));
                     log.warn("Background loop stopped at max rounds [session={}]", sessionUuid);
                     return;
@@ -79,9 +81,11 @@ public class BackgroundOrchestrationEngine {
                         session.createdAt(),
                         session.currentRoundCount() + 1,
                         session.messages(),
+                        session.environmentVariables(),
                         AiSessionStatus.RUNNING));
 
                 executionContext.clear();
+                    ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
 
                 try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid)) {
                     chatService.sendMessage(
@@ -112,6 +116,7 @@ public class BackgroundOrchestrationEngine {
             }
         } finally {
             executionContext.clear();
+            ThreadLocalExecutionContext.clear();
         }
     }
 }

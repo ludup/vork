@@ -51,6 +51,7 @@ class ChatServiceSuspensionPersistenceTest {
             123L,
             0,
             List.of(),
+            AiSession.defaultEnvironmentVariables(),
             AiSessionStatus.RUNNING);
         sessionRepo.save(initial);
 
