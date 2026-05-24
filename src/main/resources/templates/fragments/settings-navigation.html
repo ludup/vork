@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="backToHome">
+    <div class="mb-3">
+        <a href="/" class="btn btn-outline-secondary btn-sm" title="Back to home" aria-label="Back to home">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+    </div>
+</th:block>
+
+<th:block th:fragment="backToSettings">
+    <div class="mb-3">
+        <a href="/settings" class="btn btn-outline-secondary btn-sm" title="Back to settings" aria-label="Back to settings">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+    </div>
+</th:block>
+</body>
+</html>

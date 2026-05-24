@@ -6,18 +6,16 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.RememberMeServices;
 import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices;
 
 /**
  * Spring Security configuration for custom login, page protection, and remember-me.
+ * Uses DatabaseUserDetailsService for credential loading from MongoDB.
  */
 @Configuration
 @EnableWebSecurity
@@ -25,7 +23,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                           RememberMeServices rememberMeServices) throws Exception {
+                                           RememberMeServices rememberMeServices,
+                                           UserDetailsService userDetailsService) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/**").permitAll()
@@ -56,7 +55,7 @@ public class SecurityConfig {
                 .key("vork-remember-me-key-change-in-production")
             )
             .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/api/authorization/**", "/ws/**", "/logout")
+                .ignoringRequestMatchers("/api/authorization/**", "/api/chat/**", "/ws/**", "/logout")
             )
             .sessionManagement(session -> session
                 .sessionConcurrency(concurrency -> concurrency
@@ -90,21 +89,6 @@ public class SecurityConfig {
         rememberMeServices.setUseSecureCookie(false);
         rememberMeServices.setAlwaysRemember(false);
         return rememberMeServices;
-    }
-
-    @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails admin = User.withUsername("admin")
-            .password(passwordEncoder.encode("admin123"))
-                .roles("ADMIN")
-                .build();
-
-        UserDetails user = User.withUsername("user")
-            .password(passwordEncoder.encode("user123"))
-            .roles("USER")
-            .build();
-
-        return new InMemoryUserDetailsManager(admin, user);
     }
 
     @Bean

@@ -3,6 +3,7 @@ package sh.vork.ai.controller;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,7 +43,10 @@ import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.protocol.UiEventFrame;
 import sh.vork.ai.security.AuthorizationRuleEngine;
+import sh.vork.ai.security.ToolSuspensionException;
+import sh.vork.ai.security.VisualizableTool;
 import sh.vork.ai.service.AiOrchestrationService;
+import sh.vork.ai.service.ChatService;
 import sh.vork.scheduling.service.AiSchedulerService;
 import sh.vork.database.DatabaseRepository;
 import sh.vork.scheduling.service.SystemBackgroundAuthentication;
@@ -69,6 +73,7 @@ public class ChatAuthorizationController {
     private final Executor aiBackgroundExecutor;
     private final AiSchedulerService aiSchedulerService;
     private final FileStorageService fileStorageService;
+    private final ChatService chatService;
 
     @Autowired
     public ChatAuthorizationController(DatabaseRepository<AiSession> sessionRepo,
@@ -79,7 +84,8 @@ public class ChatAuthorizationController {
                                        List<ToolCallback> toolCallbacks,
                                        @Qualifier("aiBackgroundExecutor") Executor aiBackgroundExecutor,
                                        AiSchedulerService aiSchedulerService,
-                                       FileStorageService fileStorageService) {
+                                       FileStorageService fileStorageService,
+                                       ChatService chatService) {
         this.sessionRepo = sessionRepo;
         this.authorizationRuleEngine = authorizationRuleEngine;
         this.aiService = aiService;
@@ -88,6 +94,7 @@ public class ChatAuthorizationController {
         this.objectMapper = objectMapper;
         this.aiBackgroundExecutor = aiBackgroundExecutor;
         this.aiSchedulerService = aiSchedulerService;
+        this.chatService = chatService;
         this.toolCallbacksByName = toolCallbacks.stream().collect(
                 java.util.stream.Collectors.toMap(
                         t -> t.getToolDefinition().name(),
@@ -111,6 +118,7 @@ public class ChatAuthorizationController {
             toolCallbacks,
             aiBackgroundExecutor,
             aiSchedulerService,
+            null,
             null);
         }
 
@@ -226,6 +234,7 @@ public class ChatAuthorizationController {
                         session.provider(),
                         originMode,
                         session.username(),
+                        session.name(),
                         session.createdAt(),
                     session.currentRoundCount(),
                         List.copyOf(updated),
@@ -250,8 +259,74 @@ public class ChatAuthorizationController {
             }
 
             log.info("Resuming model call [historyMessages={}]", history.size());
-            String finalText = aiService.generateWithHistory(history, "Please continue based on the tool response.",
-                    resolveProvider(session.provider()));
+            String finalText;
+            try {
+                finalText = aiService.generateWithHistory(history, "Please continue based on the tool response.",
+                        resolveProvider(session.provider()));
+            } catch (ToolSuspensionException ex) {
+                String simulatedToolCallId = "pending-" + UUID.randomUUID();
+                List<AiChatMessage.ToolCallRef> pendingToolCalls = List.of(
+                    new AiChatMessage.ToolCallRef(simulatedToolCallId, "FUNCTION", ex.getToolName(), ex.getArguments()));
+
+                ToolCallback targetTool = toolCallbacksByName.get(ex.getToolName());
+                String displayArguments = ex.getArguments();
+                if (targetTool instanceof VisualizableTool visualTool) {
+                    try {
+                        displayArguments = visualTool.formatAuthorizationDetails(ex.getArguments());
+                    } catch (Exception e) {
+                        log.warn("Failed to pretty print tool arguments during resumed call, using raw JSON", e);
+                    }
+                }
+
+                String justification = ex.getReasoning();
+                if (justification == null || justification.isBlank()) {
+                    justification = defaultAuthorizationReason(ex.getToolName());
+                }
+
+                UiEventFrame suspendedPromptEvent = new UiEventFrame(
+                    UUID.randomUUID().toString(),
+                    "PROMPT_REQUIRED",
+                    "AUTHORIZE_TOOL",
+                    Map.of(
+                        "toolName", ex.getToolName(),
+                        "toolCallId", simulatedToolCallId,
+                        "reasoning", justification,
+                        "arguments", ex.getArguments(),
+                        "displayArguments", displayArguments,
+                        "actions", List.of("ONCE", "SESSION", "ALWAYS", "DENIED")
+                    ));
+
+                updated.add(new AiChatMessage(
+                    UUID.randomUUID().toString(),
+                    "PROMPT_REQUIRED",
+                    toJson(suspendedPromptEvent),
+                    System.currentTimeMillis(),
+                    null,
+                    pendingToolCalls,
+                    null,
+                    null));
+
+                sessionRepo.save(new AiSession(
+                    session.uuid(),
+                    session.provider(),
+                    originMode,
+                    session.username(),
+                    session.name(),
+                    session.createdAt(),
+                    session.currentRoundCount(),
+                    List.copyOf(updated),
+                    AiSessionStatus.AWAITING_AUTHORIZATION));
+
+                messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
+                log.info("Resumed call suspended again [tool={}, session={}]", ex.getToolName(), sessionUuid);
+
+                return ResponseEntity.ok(Map.of(
+                    "status", "AWAITING_AUTHORIZATION",
+                    "eventType", suspendedPromptEvent.type(),
+                    "eventId", suspendedPromptEvent.eventId(),
+                    "toolName", ex.getToolName()
+                ));
+            }
 
             UiEventFrame textEvent = new UiEventFrame(
                     UUID.randomUUID().toString(),
@@ -274,10 +349,15 @@ public class ChatAuthorizationController {
                     session.provider(),
                     originMode,
                     session.username(),
+                    session.name(),
                     session.createdAt(),
                     session.currentRoundCount(),
                     List.copyOf(updated),
                     AiSessionStatus.RUNNING));
+
+            if (chatService != null) {
+                chatService.maybeGenerateSessionName(session.uuid());
+            }
 
             log.info("Resumption completed [finalTextLength={}]", finalText == null ? 0 : finalText.length());
             log.debug("Resumption final text: {}", abbreviate(finalText == null ? "" : finalText, 4000));
@@ -476,25 +556,48 @@ public class ChatAuthorizationController {
     private String buildTerminalToolResponse(String argumentsJson, String toolResult) {
         String command = extractTerminalCommand(argumentsJson);
         String rawOutput = unwrapTerminalToolResult(toolResult);
-        String displayOutput = normalizeTerminalTranscript(command, rawOutput);
         Map<String, Object> payload = new HashMap<>();
         payload.put("status", "COMPLETED");
         payload.put("command", command);
-        payload.put("rawOutput", rawOutput);
-        payload.put("displayOutput", displayOutput);
+        String outputFileUuid = null;
         
         // Extract file UUID from tool result if present
         try {
             Map<String, Object> toolResultObj = objectMapper.readValue(toolResult, new TypeReference<Map<String, Object>>() {});
             Object fileUuid = toolResultObj.get("outputFileUuid");
             if (fileUuid != null) {
-                payload.put("outputFileUuid", String.valueOf(fileUuid));
+                outputFileUuid = String.valueOf(fileUuid);
+                payload.put("outputFileUuid", outputFileUuid);
             }
         } catch (Exception ignored) {
             // Not a JSON object or doesn't have file UUID, continue
         }
+
+        // If the tool output was routed to a stored file, load it into history payload
+        // so the model can reason over real command output on resumed calls.
+        if ((rawOutput == null || rawOutput.isBlank()) && outputFileUuid != null && fileStorageService != null) {
+            rawOutput = readTerminalOutputFile(outputFileUuid);
+        }
+
+        String displayOutput = normalizeTerminalTranscript(command, rawOutput);
+        payload.put("rawOutput", rawOutput == null ? "" : rawOutput);
+        payload.put("displayOutput", displayOutput);
         
         return toJson(payload);
+    }
+
+    private String readTerminalOutputFile(String fileUuid) {
+        try (InputStream in = fileStorageService.getContent(fileUuid)) {
+            byte[] bytes = in.readAllBytes();
+            String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            if (text.length() > 200_000) {
+                return text.substring(0, 200_000) + "\n... [truncated, full output in attachment " + fileUuid + "]";
+            }
+            return text;
+        } catch (Exception ex) {
+            log.warn("Failed to read terminal output attachment for history [fileUuid={}]: {}", fileUuid, ex.getMessage());
+            return "";
+        }
     }
 
     private String unwrapTerminalToolResult(String toolResult) {
@@ -638,6 +741,13 @@ public class ChatAuthorizationController {
             case "ALWAYS", "ALLOW_ALWAYS", "PERMANENT" -> "ALWAYS";
             default -> "ONCE";
         };
+    }
+
+    private static String defaultAuthorizationReason(String toolName) {
+        if ("compileJavaType".equals(toolName)) {
+            return "Approval is required to compile and register a new Java type so it can be used in later steps.";
+        }
+        return "Approval is required to run this protected action so your request can continue safely.";
     }
 
     private static String resolveUsername() {

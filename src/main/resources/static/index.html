@@ -17,11 +17,30 @@
 <!-- Splash screen -->
 <div id="splash">
     <img src="/images/Vork.png" alt="Vork">
+    <div id="splash-tagline"><span id="splash-typed"></span><span id="splash-cursor"></span></div>
 </div>
 
 <div class="page-layout">
 
 <div class="chat-layout">
+
+<div class="chat-shell">
+
+    <aside id="chat-sidebar" class="chat-sidebar">
+        <div class="sidebar-top">
+            <button id="sidebar-toggle" type="button" class="btn btn-outline-secondary btn-sm" title="Collapse menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <button id="new-chat-btn" type="button" class="btn btn-outline-secondary btn-sm sidebar-action">
+                <i class="fa-solid fa-pen-to-square me-1"></i>
+                <span class="sidebar-label">New Chat</span>
+            </button>
+        </div>
+        <div class="sidebar-section-title">Chats</div>
+        <div id="chat-session-list" class="chat-session-list"></div>
+    </aside>
+
+    <div class="chat-main">
 
     <!-- Header -->
     <header class="chat-header d-flex align-items-center justify-content-between">
@@ -31,6 +50,9 @@
             <span id="status-dot" class="status-dot connecting ms-1" title="Connecting&hellip;"></span>
         </div>
         <div class="d-flex align-items-center gap-2">
+            <a href="/settings" class="btn btn-outline-secondary btn-sm" id="settings-btn" title="Settings">
+                <i class="fa-solid fa-gear"></i>
+            </a>
             <button id="console-toggle" type="button" class="btn btn-outline-secondary btn-sm console-toggle-btn">
                 <i class="fa-solid fa-terminal"></i> Console
             </button>
@@ -84,6 +106,10 @@
             Session: <code id="session-display">initialising&hellip;</code>
         </div>
     </div>
+
+    </div>
+
+</div>
 
 </div>
 

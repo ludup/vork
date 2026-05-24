@@ -17,10 +17,16 @@ const fileInput      = document.getElementById('file-input');
 const uploadFilesBtn = document.getElementById('upload-files-btn');
 const logoutBtn      = document.getElementById('logout-btn');
 const logoutForm     = document.getElementById('logout-form');
+const sidebarToggle  = document.getElementById('sidebar-toggle');
+const newChatBtn     = document.getElementById('new-chat-btn');
+const sessionListEl  = document.getElementById('chat-session-list');
 
 let sessionUuid = null;
 let stomp       = null;
+let chatSubscription = null;
 let waiting     = false;
+let sessions    = [];
+let editingSessionUuid = null;
 
 const terminalState = {
     views: new Map(),
@@ -162,6 +168,39 @@ function focusMessageInput() {
     requestAnimationFrame(function () {
         messageInput.focus();
     });
+}
+
+function resetTerminalState() {
+    for (const terminalId of terminalState.socketsByTerminal.keys()) {
+        closeTerminalSocket(terminalId);
+    }
+    terminalState.views.clear();
+    terminalState.pendingByTerminal.clear();
+}
+
+function clearConversationUi() {
+    resetTerminalState();
+    messagesArea.querySelectorAll('.message-row').forEach(function (row) {
+        if (row !== typingEl) {
+            row.remove();
+        }
+    });
+    showTyping(false);
+    setInputEnabled(true);
+}
+
+function formatRelativeTime(epochMillis) {
+    if (!epochMillis) {
+        return '';
+    }
+    const deltaMs = Date.now() - epochMillis;
+    const mins = Math.floor(deltaMs / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    return days + 'd ago';
 }
 
 // ── MIME-type helpers ─────────────────────────────────────────────────────────
@@ -681,6 +720,18 @@ async function renderTerminalSessionRecord(msg, index, messages) {
     return true;
 }
 
+function findLastUnansweredPromptIndex(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return -1;
+    }
+    const lastIndex = messages.length - 1;
+    const last = messages[lastIndex];
+    if (last && last.role === 'PROMPT_REQUIRED') {
+        return lastIndex;
+    }
+    return -1;
+}
+
 function renderPromptRequiredFrame(frame) {
     const payload = frame.payload || {};
     const reasoning = typeof payload.reasoning === 'string' && payload.reasoning.trim()
@@ -785,8 +836,13 @@ function handleIncomingUiFrame(frame) {
     }
 }
 
-function renderSessionRecord(msg, index, messages) {
+async function renderSessionRecord(msg, index, messages, lastPromptIndex) {
     if (msg.role === 'PROMPT_REQUIRED') {
+        // Only render the final unanswered authorization prompt.
+        // Historical prompts that already led to a tool response are omitted.
+        if (index !== lastPromptIndex) {
+            return;
+        }
         const frame = tryParseJson(msg.content);
         if (frame && isUiEventFrame(frame)) {
             renderPromptRequiredFrame(frame);
@@ -803,7 +859,7 @@ function renderSessionRecord(msg, index, messages) {
     }
 
     if (msg.role === 'TOOL') {
-        renderTerminalSessionRecord(msg, index, messages);
+        await renderTerminalSessionRecord(msg, index, messages);
         return;
     }
 
@@ -1037,6 +1093,18 @@ if (logoutBtn) {
     });
 }
 
+if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', function () {
+        document.body.classList.toggle('sidebar-collapsed');
+    });
+}
+
+if (newChatBtn) {
+    newChatBtn.addEventListener('click', function () {
+        createNewChat();
+    });
+}
+
 // ── WebSocket / STOMP ────────────────────────────────────────────────────────
 
 function connectWebSocket() {
@@ -1046,28 +1114,7 @@ function connectWebSocket() {
         reconnectDelay: 5000,
         onConnect: function () {
             setStatus('connected');
-            stomp.subscribe('/topic/chat/' + sessionUuid, function (frame) {
-                const msg = JSON.parse(frame.body);
-                if (isTerminalEventFrame(msg)) {
-                    handleIncomingUiFrame(msg);
-                    return;
-                }
-
-                showTyping(false);
-                if (!hasLiveTerminal()) {
-                    setInputEnabled(true);
-                }
-
-                if (isUiEventFrame(msg)) {
-                    handleIncomingUiFrame(msg);
-                } else {
-                    renderMessage(msg);
-                }
-
-                if (!hasLiveTerminal()) {
-                    focusMessageInput();
-                }
-            });
+            subscribeToCurrentSession();
         },
         onDisconnect: function () { setStatus('disconnected'); },
         onStompError: function () { setStatus('disconnected'); }
@@ -1075,22 +1122,264 @@ function connectWebSocket() {
     stomp.activate();
 }
 
-// ── Session init ─────────────────────────────────────────────────────────────
+function subscribeToCurrentSession() {
+    if (!stomp || !stomp.connected || !sessionUuid) {
+        return;
+    }
+    if (chatSubscription) {
+        chatSubscription.unsubscribe();
+        chatSubscription = null;
+    }
+    chatSubscription = stomp.subscribe('/topic/chat/' + sessionUuid, function (frame) {
+        const msg = JSON.parse(frame.body);
+        if (isTerminalEventFrame(msg)) {
+            handleIncomingUiFrame(msg);
+            return;
+        }
 
-function initSession() {
-    fetch('/api/chat/session?provider=' + providerSel.value)
+        showTyping(false);
+        if (!hasLiveTerminal()) {
+            setInputEnabled(true);
+        }
+
+        if (isUiEventFrame(msg)) {
+            handleIncomingUiFrame(msg);
+        } else {
+            renderMessage(msg);
+        }
+
+        if (!hasLiveTerminal()) {
+            focusMessageInput();
+        }
+    });
+}
+
+// ── Session init + sidebar ───────────────────────────────────────────────────
+
+function renderSessionList() {
+    sessionListEl.innerHTML = '';
+    if (!sessions || sessions.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'chat-session-empty';
+        empty.textContent = 'No chats yet';
+        sessionListEl.appendChild(empty);
+        return;
+    }
+
+    sessions.forEach(function (session) {
+        const item = document.createElement('div');
+        item.className = 'chat-session-item' + (session.sessionUuid === sessionUuid ? ' active' : '');
+
+        const isEditing = editingSessionUuid === session.sessionUuid;
+
+        if (isEditing) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'chat-session-rename-input';
+            input.value = session.sessionName || 'Untitled';
+            input.maxLength = 60;
+
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'chat-session-rename chat-session-rename-save';
+            saveBtn.title = 'Save name';
+            saveBtn.setAttribute('aria-label', 'Save name');
+            saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'chat-session-rename chat-session-rename-cancel';
+            cancelBtn.title = 'Cancel rename';
+            cancelBtn.setAttribute('aria-label', 'Cancel rename');
+            cancelBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+
+            const submit = function () {
+                submitSessionRename(session.sessionUuid, input.value);
+            };
+
+            saveBtn.addEventListener('click', submit);
+            cancelBtn.addEventListener('click', function () {
+                editingSessionUuid = null;
+                renderSessionList();
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submit();
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    editingSessionUuid = null;
+                    renderSessionList();
+                }
+            });
+
+            item.appendChild(input);
+            item.appendChild(saveBtn);
+            item.appendChild(cancelBtn);
+            sessionListEl.appendChild(item);
+            requestAnimationFrame(function () {
+                input.focus();
+                input.select();
+            });
+            return;
+        }
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'chat-session-open';
+        openBtn.innerHTML =
+            '<span class="chat-session-name">' + escapeHtml(session.sessionName || 'Untitled') + '</span>' +
+            '<span class="chat-session-meta">' + escapeHtml(formatRelativeTime(session.createdAt)) + '</span>';
+        openBtn.addEventListener('click', function () {
+            loadSession(session.sessionUuid);
+        });
+
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'chat-session-rename';
+        renameBtn.title = 'Rename chat';
+        renameBtn.setAttribute('aria-label', 'Rename chat');
+        renameBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+        renameBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            editingSessionUuid = session.sessionUuid;
+            renderSessionList();
+        });
+
+        item.appendChild(openBtn);
+        item.appendChild(renameBtn);
+        sessionListEl.appendChild(item);
+    });
+}
+
+function submitSessionRename(targetSessionUuid, nextName) {
+    fetch('/api/chat/session/' + encodeURIComponent(targetSessionUuid) + '/name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nextName })
+    })
         .then(function (resp) {
-            if (!resp.ok) { throw new Error('HTTP ' + resp.status + ' \u2014 ' + resp.statusText); }
+            if (!resp.ok) { throw new Error('HTTP ' + resp.status + ' — ' + resp.statusText); }
+            return resp.json();
+        })
+        .then(function (renamed) {
+            editingSessionUuid = null;
+            sessions = sessions.map(function (s) {
+                return s.sessionUuid === renamed.sessionUuid ? renamed : s;
+            });
+            renderSessionList();
+            if (sessionUuid === renamed.sessionUuid) {
+                sessionDisplay.textContent = (renamed.sessionName || 'Untitled') + ' · ' + sessionUuid.substring(0, 8) + '…';
+            }
+        })
+        .catch(function (err) {
+            editingSessionUuid = null;
+            renderSessionList();
+            renderMessage({ role: 'ERROR', content: '**Failed to rename chat:** ' + err.message });
+        });
+}
+
+function loadSessionList() {
+    return fetch('/api/chat/sessions')
+        .then(function (resp) {
+            if (!resp.ok) { throw new Error('HTTP ' + resp.status + ' — ' + resp.statusText); }
             return resp.json();
         })
         .then(function (data) {
+            sessions = Array.isArray(data) ? data : [];
+            renderSessionList();
+            return sessions;
+        });
+}
+
+function loadSession(targetSessionUuid) {
+    let url = '/api/chat/session?provider=' + encodeURIComponent(providerSel.value);
+    if (targetSessionUuid) {
+        url += '&sessionUuid=' + encodeURIComponent(targetSessionUuid);
+    }
+
+    return fetch(url)
+        .then(function (resp) {
+            if (!resp.ok) { throw new Error('HTTP ' + resp.status + ' — ' + resp.statusText); }
+            return resp.json();
+        })
+        .then(async function (data) {
             sessionUuid = data.sessionUuid;
-            sessionDisplay.textContent = sessionUuid.substring(0, 8) + '\u2026';
-            (data.messages || []).forEach(function (msg, index, messages) {
-                renderSessionRecord(msg, index, messages);
-            });
-            connectWebSocket();
+            sessionDisplay.textContent = (data.sessionName || 'Untitled') + ' · ' + sessionUuid.substring(0, 8) + '…';
+            clearConversationUi();
+            const messages = data.messages || [];
+            const lastPromptIndex = findLastUnansweredPromptIndex(messages);
+            for (let i = 0; i < messages.length; i++) {
+                await renderSessionRecord(messages[i], i, messages, lastPromptIndex);
+            }
+
+            if (!stomp) {
+                connectWebSocket();
+            } else if (stomp.connected) {
+                subscribeToCurrentSession();
+            }
+
+            if (data.provider && providerSel.querySelector('option[value="' + data.provider + '"]')) {
+                providerSel.value = data.provider;
+            }
+
+            loadSessionList();
             focusMessageInput();
+
+            // Show a welcome message for new (empty) sessions
+            if (messages.length === 0) {
+                showTyping(true);
+                setInputEnabled(false);
+                fetch('/api/chat/welcome?provider=' + encodeURIComponent(providerSel.value))
+                    .then(function (resp) { return resp.ok ? resp.json() : Promise.reject(resp.statusText); })
+                    .then(function (welcome) {
+                        showTyping(false);
+                        renderMessage({ role: 'ASSISTANT', content: welcome.content });
+                        setInputEnabled(true);
+                        welcomeSignal.resolve();
+                    })
+                    .catch(function () {
+                        showTyping(false);
+                        setInputEnabled(true);
+                        welcomeSignal.resolve();
+                    });
+            } else {
+                // Existing session — dismiss splash immediately
+                welcomeSignal.resolve();
+            }
+        })
+        .catch(function (err) {
+            renderMessage({ role: 'ERROR', content: '**Failed to load session:** ' + err.message });
+            setStatus('disconnected');
+            setInputEnabled(false);
+            welcomeSignal.resolve(); // ensure splash is never stuck
+        });
+}
+
+function createNewChat() {
+    fetch('/api/chat/session/new?provider=' + encodeURIComponent(providerSel.value))
+        .then(function (resp) {
+            if (!resp.ok) { throw new Error('HTTP ' + resp.status + ' — ' + resp.statusText); }
+            return resp.json();
+        })
+        .then(function (session) {
+            return loadSession(session.sessionUuid);
+        })
+        .catch(function (err) {
+            renderMessage({ role: 'ERROR', content: '**Failed to create new chat:** ' + err.message });
+        });
+}
+
+function initSession() {
+    loadSessionList()
+        .then(function (list) {
+            if (list.length > 0) {
+                return loadSession(list[0].sessionUuid);
+            }
+            return loadSession();
         })
         .catch(function (err) {
             renderMessage({ role: 'ERROR', content: '**Failed to initialise session:** ' + err.message });
@@ -1156,23 +1445,61 @@ chatForm.addEventListener('submit', function (e) {
 
 // ── Splash ───────────────────────────────────────────────────────────────────
 
+// Resolved when the welcome message is ready (or skipped for existing sessions).
+const welcomeSignal = (function () {
+    let resolve;
+    const promise = new Promise(function (res) { resolve = res; });
+    return { promise: promise, resolve: resolve };
+}());
+
 (function runSplash() {
     const splash     = document.getElementById('splash');
     const splashImg  = splash.querySelector('img');
+    const taglineEl  = document.getElementById('splash-tagline');
+    const typedEl    = document.getElementById('splash-typed');
+    const cursorEl   = document.getElementById('splash-cursor');
     const chatLayout = document.querySelector('.chat-layout');
 
-    // Start glitch after ~4.4 seconds (0.6s glitch + fade before 5s total)
-    setTimeout(function () {
-        splashImg.classList.add('glitch');
-    }, 4400);
+    const SPLASH_MESSAGE = 'Loading the Vork Concierge...';
 
-    // Fade out after glitch completes
+    function dismissSplash() {
+        cursorEl.classList.remove('blink');
+        cursorEl.style.opacity = '0';
+        splashImg.classList.add('glitch');
+        setTimeout(function () {
+            chatLayout.classList.add('visible');
+            splash.classList.add('fade-out');
+            focusMessageInput();
+            splash.addEventListener('transitionend', function () { splash.remove(); }, { once: true });
+        }, 600);
+    }
+
+    function charDelay(ch) {
+        // Base 48-88 ms per character; slower after punctuation; random micro-pauses
+        let delay = 48 + Math.random() * 40;
+        if (ch === '.' || ch === ',') { delay += 100 + Math.random() * 120; }
+        if (Math.random() < 0.14)     { delay += 70  + Math.random() * 130; } // thinking pause
+        return delay;
+    }
+
+    function typeMessage(index) {
+        if (index >= SPLASH_MESSAGE.length) {
+            // Typing finished — wait for welcome signal then dismiss
+            welcomeSignal.promise.then(dismissSplash);
+            return;
+        }
+        typedEl.textContent += SPLASH_MESSAGE[index];
+        setTimeout(function () { typeMessage(index + 1); }, charDelay(SPLASH_MESSAGE[index]));
+    }
+
+    // Show tagline + cursor after logo pop animation finishes (~0.8 s)
     setTimeout(function () {
-        chatLayout.classList.add('visible');
-        splash.classList.add('fade-out');
-        focusMessageInput();
-        splash.addEventListener('transitionend', function () { splash.remove(); }, { once: true });
-    }, 5000);
+        taglineEl.style.opacity = '1';
+        cursorEl.classList.add('blink');
+
+        // Blink cursor alone for 500 ms, then start typing
+        setTimeout(function () { typeMessage(0); }, 500);
+    }, 800);
 }());
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

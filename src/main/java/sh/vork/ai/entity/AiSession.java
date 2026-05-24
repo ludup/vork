@@ -16,6 +16,7 @@ import java.util.List;
  * @param provider  name of the {@link sh.vork.ai.AiProvider} in use
  * @param originMode execution origin mode for this session
  * @param username  owning principal for the session
+ * @param name      human-friendly session label (non-unique)
  * @param createdAt epoch-milliseconds when the session was created
  * @param currentRoundCount number of autonomous background rounds already executed
  * @param messages  ordered list of conversation turns
@@ -26,33 +27,54 @@ public record AiSession(
         String              provider,
     SessionOriginMode   originMode,
     String              username,
+    String              name,
         long                createdAt,
     int                 currentRoundCount,
         List<AiChatMessage> messages,
     AiSessionStatus     status
 ) implements DatabaseEntity {
 
+    public AiSession {
+        if (originMode == null) {
+            originMode = SessionOriginMode.WEB;
+        }
+        if (username == null || username.isBlank()) {
+            username = "anonymous";
+        }
+        if (name == null || name.isBlank()) {
+            name = "Untitled";
+        }
+        if (messages == null) {
+            messages = List.of();
+        }
+        if (status == null) {
+            status = AiSessionStatus.RUNNING;
+        }
+    }
+
     /** Backward-compatible constructor for sessions created before the status field. */
     public AiSession(String uuid, String provider, long createdAt, List<AiChatMessage> messages) {
-        this(uuid, provider, SessionOriginMode.WEB, "anonymous", createdAt, 0, messages, AiSessionStatus.RUNNING);
+        this(uuid, provider, SessionOriginMode.WEB, "anonymous", "Untitled", createdAt, 0, messages,
+                AiSessionStatus.RUNNING);
     }
 
     /** Backward-compatible constructor for sessions created before the username field. */
     public AiSession(String uuid, String provider, long createdAt, List<AiChatMessage> messages, String status) {
-        this(uuid, provider, SessionOriginMode.WEB, "anonymous", createdAt, 0, messages,
+        this(uuid, provider, SessionOriginMode.WEB, "anonymous", "Untitled", createdAt, 0, messages,
                 parseLegacyStatus(status));
     }
 
     /** Backward-compatible constructor for sessions created before the originMode field. */
     public AiSession(String uuid, String provider, String username, long createdAt,
                      List<AiChatMessage> messages, AiSessionStatus status) {
-        this(uuid, provider, SessionOriginMode.WEB, username, createdAt, 0, messages, status);
+        this(uuid, provider, SessionOriginMode.WEB, username, "Untitled", createdAt, 0, messages, status);
     }
 
     /** Backward-compatible constructor for sessions created before enum migration. */
     public AiSession(String uuid, String provider, String username, long createdAt,
                      List<AiChatMessage> messages, String status) {
-        this(uuid, provider, SessionOriginMode.WEB, username, createdAt, 0, messages, parseLegacyStatus(status));
+        this(uuid, provider, SessionOriginMode.WEB, username, "Untitled", createdAt, 0, messages,
+                parseLegacyStatus(status));
     }
 
     private static AiSessionStatus parseLegacyStatus(String legacyStatus) {

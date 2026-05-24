@@ -55,6 +55,7 @@ public class AiJobRunner implements Runnable {
                 AiProvider.BACKGROUND_SCHEDULER.name(),
                 SessionOriginMode.BACKGROUND,
                 job.username(),
+                "Untitled",
                 now,
                 0,
                 List.of(seedMessage),

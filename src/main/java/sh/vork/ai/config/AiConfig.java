@@ -262,6 +262,7 @@ public class AiConfig {
                             session.provider(),
                             session.originMode(),
                             session.username(),
+                            session.name(),
                             session.createdAt(),
                             session.currentRoundCount(),
                             session.messages(),

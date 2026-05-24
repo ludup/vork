@@ -1,0 +1,17 @@
+body {
+    background: var(--bs-body-bg);
+}
+.settings-card {
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: 1rem;
+    background: var(--bs-card-bg);
+    transition: box-shadow 0.2s, border-color 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.settings-card:hover {
+    border-color: var(--bs-primary);
+    box-shadow: 0 4px 16px rgba(253,170,2,0.15);
+}
+.settings-card .fa-2x {
+    color: var(--bs-primary);
+}
