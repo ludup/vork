@@ -18,7 +18,7 @@ import org.mockito.Mockito;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import sh.vork.ai.context.ThreadLocalExecutionContext;
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.protocol.interaction.FieldSource;
 import sh.vork.ai.protocol.interaction.FormField;
@@ -32,14 +32,14 @@ class VirtualSshServiceCredentialsTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
-        ThreadLocalExecutionContext.clear();
+        ToolExecutionContext.clear();
     }
 
     @Test
     void connectClient_withoutStoredCredentials_requestsSecretsUsingNodeUuidKeys() throws Exception {
         SecureCredentialStore credentialStore = Mockito.mock(SecureCredentialStore.class);
                 DatabaseRepository<VorkNode> nodeRepository = new MapDatabaseRepository<>(VorkNode.class);
-                nodeRepository.save(new VorkNode("node-123", "alice", "example.com", "system", 1L, 1L));
+                nodeRepository.save(new VorkNode("node-123", "alice", "example.com", "system", 1L, 1L, ""));
         when(credentialStore.getSecret(any(VorkUser.class), any(String.class))).thenReturn(null);
 
         VirtualSshService service = new VirtualSshService();
@@ -122,8 +122,9 @@ class VirtualSshServiceCredentialsTest {
     void connectClient_withoutUsernameAndMultipleNodes_requestsUsernameSelection() throws Exception {
         SecureCredentialStore credentialStore = Mockito.mock(SecureCredentialStore.class);
         DatabaseRepository<VorkNode> nodeRepository = new MapDatabaseRepository<>(VorkNode.class);
-        nodeRepository.save(new VorkNode("node-1", "alice", "example.com", "ubuntu", 1L, 1L));
-        nodeRepository.save(new VorkNode("node-2", "alice", "example.com", "ec2-user", 2L, 2L));
+        nodeRepository.save(new VorkNode("node-1", "alice", "example.com", "ubuntu", 1L, 1L, ""));
+        nodeRepository.save(new VorkNode("node-2", "alice", "example.com", "ec2-user", 2L, 2L, ""));
+        when(credentialStore.getSecret(any(VorkUser.class), any(String.class))).thenReturn(null);
 
         VirtualSshService service = new VirtualSshService();
         Field credentialStoreField = VirtualSshService.class.getDeclaredField("credentialStore");
@@ -155,7 +156,7 @@ class VirtualSshServiceCredentialsTest {
         void connectClient_withoutUsernameAndSingleNode_usesExistingNode() throws Exception {
                 SecureCredentialStore credentialStore = Mockito.mock(SecureCredentialStore.class);
                 DatabaseRepository<VorkNode> nodeRepository = new MapDatabaseRepository<>(VorkNode.class);
-                nodeRepository.save(new VorkNode("node-777", "alice", "example.com", "ubuntu", 1L, 1L));
+                nodeRepository.save(new VorkNode("node-777", "alice", "example.com", "ubuntu", 1L, 1L, ""));
                 when(credentialStore.getSecret(any(VorkUser.class), any(String.class))).thenReturn(null);
 
                 VirtualSshService service = new VirtualSshService();

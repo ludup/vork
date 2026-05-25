@@ -10,6 +10,9 @@ import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import org.slf4j.MDC;
+
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.protocol.interaction.FieldSource;
 import sh.vork.ai.protocol.interaction.FormAction;
@@ -31,14 +34,12 @@ public class SecuredToolCallback implements ToolCallback {
 
     @Override
     public String call(String arguments) {
-        enforce(arguments, null);
-        return delegate.call(arguments);
+        return invoke(arguments, null);
     }
 
     @Override
     public String call(String arguments, ToolContext toolContext) {
-        enforce(arguments, toolContext);
-        return delegate.call(arguments, toolContext);
+        return invoke(arguments, toolContext);
     }
 
     @Override
@@ -77,6 +78,34 @@ public class SecuredToolCallback implements ToolCallback {
                             new FormAction("ALWAYS", "Always Allow", "success"),
                             new FormAction("DENIED", "Deny", "danger")));
             throw new ToolSuspensionException(toolName, effectiveArguments, reasoning, formSchema);
+        }
+    }
+
+    private String invoke(String arguments, ToolContext toolContext) {
+        String sessionUuid = ToolExecutionContext.getSessionUuid();
+        if (sessionUuid == null || sessionUuid.isBlank()) {
+            sessionUuid = resolveSessionUuid();
+        }
+        boolean suspended = false;
+
+        if (sessionUuid != null && !sessionUuid.isBlank()) {
+            ToolExecutionContext.bindSessionUuid(sessionUuid);
+        }
+
+        try {
+            enforce(arguments, toolContext);
+            return toolContext == null ? delegate.call(arguments) : delegate.call(arguments, toolContext);
+        } catch (ToolSuspensionException ex) {
+            suspended = true;
+            throw ex;
+        } finally {
+            if (!suspended) {
+                if (ToolExecutionContext.isBound()) {
+                    ToolExecutionContext.complete(sessionUuid);
+                } else {
+                    ToolExecutionContext.clear();
+                }
+            }
         }
     }
 
@@ -221,5 +250,13 @@ public class SecuredToolCallback implements ToolCallback {
             return "anonymous";
         }
         return auth.getName();
+    }
+
+    private static String resolveSessionUuid() {
+        String sessionUuid = MDC.get("sessionUuid");
+        if (sessionUuid == null || sessionUuid.isBlank() || "<null>".equals(sessionUuid)) {
+            return null;
+        }
+        return sessionUuid;
     }
 }

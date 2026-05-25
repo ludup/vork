@@ -104,6 +104,16 @@ public class MapDatabaseRepository<T extends DatabaseEntity> implements Database
         return store.size();
     }
 
+    @Override
+    public T get(SearchQuery... queries) {
+        return store.values().stream()
+                .map(this::toMap)
+                .filter(doc -> matchesAll(doc, queries))
+                .findFirst()
+                .map(this::fromMap)
+                .orElse(null);
+    }
+
     /**
      * In-memory implementation of {@link DatabaseRepository#search}.
      *

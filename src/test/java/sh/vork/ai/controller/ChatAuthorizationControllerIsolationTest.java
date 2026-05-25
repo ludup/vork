@@ -24,6 +24,7 @@ import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.function.ExecuteTerminalCommandRequest;
 import sh.vork.ai.protocol.UiEventFrame;
@@ -38,6 +39,11 @@ import sh.vork.scheduling.service.AiSchedulerService;
 import sh.vork.security.SecureCredentialStore;
 
 class ChatAuthorizationControllerIsolationTest {
+
+        @org.junit.jupiter.api.AfterEach
+        void clearToolContext() {
+                ToolExecutionContext.clear();
+        }
 
     @Test
     void respond_webOrigin_resumesSynchronouslyOnRequestThread() throws Exception {
@@ -248,6 +254,75 @@ class ChatAuthorizationControllerIsolationTest {
         assertEquals("evt-4", response.getBody().get("eventId"));
         assertEquals("getURLContents", response.getBody().get("toolName"));
         assertEquals("AWAITING_INPUT", response.getBody().get("sessionStatus"));
+    }
+
+    @Test
+    void respond_rehydratesPersistedEnvironmentIntoToolExecutionContext() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        MapDatabaseRepository<AiSession> sessionRepo = new MapDatabaseRepository<>(AiSession.class);
+
+        String sessionUuid = "session-context-rehydrate";
+        AiChatMessage prompt = promptMessage(
+                "evt-context",
+                "compileJavaType",
+                "pending-context",
+                "{}",
+                "Need approval");
+
+        java.util.concurrent.ConcurrentHashMap<String, String> env = AiSession.defaultEnvironmentVariables();
+        env.put("HOST_KEY_VERIFICATION", "true");
+
+        sessionRepo.save(new AiSession(
+                sessionUuid,
+                AiProvider.GEMINI.name(),
+                SessionOriginMode.WEB,
+                "alice",
+                "Untitled",
+                System.currentTimeMillis(),
+                0,
+                List.of(prompt),
+                env,
+                AiSessionStatus.AWAITING_INPUT));
+
+        ToolCallback contextTool = FunctionToolCallback.builder("compileJavaType",
+                (DummyCompileToolRequest req) -> {
+                    Object value = ToolExecutionContext.get("HOST_KEY_VERIFICATION");
+                    return value == null ? "missing" : String.valueOf(value);
+                })
+                .description("Test-only context read tool")
+                .inputType(DummyCompileToolRequest.class)
+                .build();
+
+        ChatAuthorizationController controller = new ChatAuthorizationController(
+                sessionRepo,
+                new AuthorizationRuleEngine(List.of(), null),
+                new RecordingAiService("context-final"),
+                new SimpMessagingTemplate(new NoOpMessageChannel()),
+                objectMapper,
+                List.of(contextTool),
+                Runnable::run,
+                new RecordingSchedulerService(),
+                null,
+                null,
+                new SecureCredentialStore(),
+                null);
+
+        controller.respond(sessionUuid,
+                new ChatAuthorizationController.InteractionResponse("evt-context", "AUTHORIZE_TOOL", "ONCE", Map.of()));
+
+        AiSession saved = sessionRepo.get(sessionUuid);
+        assertNotNull(saved);
+        AiChatMessage toolMessage = saved.messages().stream().filter(m -> "TOOL".equals(m.role())).findFirst().orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = objectMapper.readValue(toolMessage.content(), Map.class);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> responses = (List<Map<String, Object>>) payload.get("responses");
+        assertNotNull(responses);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> responseData = objectMapper.readValue(String.valueOf(responses.get(0).get("responseData")), Map.class);
+                assertEquals("APPROVED", responseData.get("status"));
+                assertEquals("true", responseData.get("result"));
     }
 
     @Test

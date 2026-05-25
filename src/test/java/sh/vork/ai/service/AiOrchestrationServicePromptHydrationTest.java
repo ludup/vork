@@ -15,14 +15,14 @@ import org.springframework.ai.chat.client.ChatClient;
 
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.config.AiConfig;
-import sh.vork.ai.context.ThreadLocalExecutionContext;
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.memory.SessionEnvironmentService;
 
 class AiOrchestrationServicePromptHydrationTest {
 
     @AfterEach
     void clearThreadLocalContext() {
-        ThreadLocalExecutionContext.clear();
+        ToolExecutionContext.clear();
     }
 
     @Test
@@ -41,7 +41,7 @@ class AiOrchestrationServicePromptHydrationTest {
         when(envService.getEnv("session-1")).thenReturn(Map.of());
 
         AiOrchestrationService service = new AiOrchestrationService(Map.of(AiProvider.GEMINI, mock(ChatClient.class)), envService);
-        ThreadLocalExecutionContext.bindSessionUuid("session-1");
+        ToolExecutionContext.bindSessionUuid("session-1");
 
         String prompt = invokeComposeSystemPrompt(service);
 
@@ -59,7 +59,7 @@ class AiOrchestrationServicePromptHydrationTest {
         when(envService.getEnv("session-2")).thenReturn(env);
 
         AiOrchestrationService service = new AiOrchestrationService(Map.of(AiProvider.GEMINI, mock(ChatClient.class)), envService);
-        ThreadLocalExecutionContext.bindSessionUuid("session-2");
+        ToolExecutionContext.bindSessionUuid("session-2");
 
         String prompt = invokeComposeSystemPrompt(service);
 

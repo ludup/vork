@@ -32,7 +32,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import sh.vork.ai.AiProvider;
-import sh.vork.ai.context.ThreadLocalExecutionContext;
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiChatMessage.AttachmentRef;
 import sh.vork.ai.entity.AiChatMessage.ToolCallRef;
@@ -399,7 +399,8 @@ public class ChatService {
     private AiChatMessage sendMessageWithSession(AiSession session, String content,
                                                   List<String> attachmentUuids, AiProvider provider) {
         String sessionUuid = session.uuid();
-        ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
+        ToolExecutionContext.bindSessionUuid(sessionUuid);
+        ToolExecutionContext.hydrate(session.environmentVariables());
         try {
             List<Message> history = hydrateHistory(session.messages());
 
@@ -554,7 +555,7 @@ public class ChatService {
                 return null;
             }
         } finally {
-            ThreadLocalExecutionContext.clear();
+            ToolExecutionContext.clear();
         }
     }
 

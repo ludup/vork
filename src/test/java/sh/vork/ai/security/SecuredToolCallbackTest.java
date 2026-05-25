@@ -21,6 +21,7 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.exception.ToolSuspensionException;
 
 class SecuredToolCallbackTest {
@@ -28,6 +29,7 @@ class SecuredToolCallbackTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+        ToolExecutionContext.clear();
     }
 
     @Test
@@ -106,6 +108,30 @@ class SecuredToolCallbackTest {
         assertEquals(List.of("ONCE", "SESSION", "ALWAYS", "DENIED"),
                 ex.getFormSchema().actions().stream().map(a -> a.name()).toList());
     }
+
+        @Test
+        void suspendedTool_keepsExecutionContextForNextRoundTrip() {
+        AuthorizationRuleEngine rules = new AuthorizationRuleEngine(Set.of("executeTerminalCommand"));
+        ToolCallback delegate = mock(ToolCallback.class);
+        when(delegate.getToolDefinition()).thenReturn(mock(ToolDefinition.class));
+        when(delegate.getToolDefinition().name()).thenReturn("executeTerminalCommand");
+        when(delegate.call(anyString())).thenThrow(new ToolSuspensionException(
+            "executeTerminalCommand",
+            "{}",
+            "Need approval"));
+
+        SecurityContextHolder.getContext().setAuthentication(
+            new TestingAuthenticationToken("alice", "pw"));
+        ToolExecutionContext.bindSessionUuid("session-42");
+        ToolExecutionContext.put("HOST_KEY_VERIFICATION", "true");
+
+        SecuredToolCallback secured = new SecuredToolCallback(delegate, rules);
+
+        assertThrows(ToolSuspensionException.class, () -> secured.call("{}"));
+
+        ToolExecutionContext.bindSessionUuid("session-42");
+        assertEquals("true", ToolExecutionContext.get("HOST_KEY_VERIFICATION"));
+        }
 
     private static ToolCallback delegate(String toolName) {
         ToolCallback delegate = mock(ToolCallback.class);

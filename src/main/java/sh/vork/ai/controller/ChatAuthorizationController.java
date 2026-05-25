@@ -47,7 +47,7 @@ import sh.vork.ai.protocol.interaction.FieldSource;
 import sh.vork.ai.protocol.interaction.FormAction;
 import sh.vork.ai.protocol.interaction.FormField;
 import sh.vork.ai.protocol.interaction.InteractionFormSchema;
-import sh.vork.ai.context.ThreadLocalExecutionContext;
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.security.AuthorizationRuleEngine;
 import sh.vork.ai.security.VisualizableTool;
 import sh.vork.ai.service.AiOrchestrationService;
@@ -128,6 +128,9 @@ public class ChatAuthorizationController {
             throw new IllegalStateException("Session is not awaiting input: " + sessionUuid);
         }
 
+            ToolExecutionContext.bindSessionUuid(sessionUuid);
+            ToolExecutionContext.hydrate(session.environmentVariables());
+
         AiChatMessage promptMessage = findPromptMessage(session.messages(), request.eventId());
         UiEventFrame promptEvent = readEventFrame(promptMessage.content());
         String correlationEventId = (request.eventId() == null || request.eventId().isBlank())
@@ -164,7 +167,7 @@ public class ChatAuthorizationController {
                     }
                     case CONTEXT -> {
                         sessionEnvironmentService.setEnv(sessionUuid, key, value);
-                        ThreadLocalExecutionContext.put(key, value);
+                        ToolExecutionContext.put(key, value);
                     }
                     case CONVERSATION -> conversationFields.put(key, value);
                 }
@@ -346,7 +349,8 @@ public class ChatAuthorizationController {
                     AiSessionStatus.RUNNING));
 
                 aiBackgroundExecutor.execute(() -> {
-                    ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
+                    ToolExecutionContext.bindSessionUuid(sessionUuid);
+                    ToolExecutionContext.hydrate(session.environmentVariables());
                     try {
                         SecurityContextHolder.getContext()
                                 .setAuthentication(new SystemBackgroundAuthentication(session.username()));
@@ -355,11 +359,11 @@ public class ChatAuthorizationController {
                         log.error("Background resume failed [session={}]: {}", sessionUuid, ex.getMessage(), ex);
                     } finally {
                         SecurityContextHolder.clearContext();
-                        ThreadLocalExecutionContext.clear();
+                        ToolExecutionContext.clear();
                     }
                 });
 
-                    ThreadLocalExecutionContext.clear();
+                    ToolExecutionContext.clear();
 
                 return ResponseEntity.ok(Map.of(
                         "status", "BACKGROUND_RESUMED",
@@ -369,7 +373,8 @@ public class ChatAuthorizationController {
 
             log.info("Resuming model call [historyMessages={}]", history.size());
             String finalText;
-            ThreadLocalExecutionContext.bindSessionUuid(sessionUuid);
+            ToolExecutionContext.bindSessionUuid(sessionUuid);
+            ToolExecutionContext.hydrate(session.environmentVariables());
             try {
                 finalText = aiService.generateWithHistory(history,
                         "The tool result is already available in the conversation history. Do not call tools again for this turn. Summarize the result for the user and provide any concise next-step guidance.",
@@ -416,7 +421,7 @@ public class ChatAuthorizationController {
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
                 log.info("Resumed call suspended again [tool={}, session={}]", ex.getToolName(), sessionUuid);
 
-                ThreadLocalExecutionContext.clear();
+                ToolExecutionContext.clear();
 
                 return ResponseEntity.ok(Map.of(
                     "status", "AWAITING_INPUT",
@@ -457,7 +462,7 @@ public class ChatAuthorizationController {
                     AiSessionStatus.RUNNING));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, errorEvent);
-                ThreadLocalExecutionContext.clear();
+                ToolExecutionContext.clear();
 
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "status", "ERROR",
@@ -503,7 +508,7 @@ public class ChatAuthorizationController {
 
             messaging.convertAndSend("/topic/chat/" + sessionUuid, textEvent);
 
-            ThreadLocalExecutionContext.clear();
+            ToolExecutionContext.clear();
 
             return ResponseEntity.ok(Map.of(
                     "status", "WEB_RESUMED",

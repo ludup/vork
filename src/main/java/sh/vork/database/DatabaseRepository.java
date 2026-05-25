@@ -58,6 +58,18 @@ public interface DatabaseRepository<T extends DatabaseEntity> {
     long count();
 
     /**
+     * Returns the first entity that matches all of the supplied {@code queries}
+     * (combined with AND), or {@code null} if no match is found.
+     *
+     * <p>When no queries are provided every document matches, so the first
+     * document in natural storage order is returned.
+     *
+     * @param queries zero or more predicates; all must match (AND semantics)
+     * @return the first matching entity, or {@code null}
+     */
+    T get(SearchQuery... queries);
+
+    /**
      * Returns a lazily-loaded stream of entities that match all of the supplied
      * {@code queries} (combined with AND), sorted by {@code sortField} in the
      * given {@code sortOrder} and paged with {@code skip/limit}.

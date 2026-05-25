@@ -122,6 +122,12 @@ public class MongoDBRepository<T extends DatabaseEntity> implements DatabaseRepo
     }
 
     @Override
+    public T get(SearchQuery... queries) {
+        Document doc = collection.find(buildFilter(queries)).first();
+        return doc == null ? null : deserialize(doc);
+    }
+
+    @Override
     public Stream<T> search(int page, int pageSize, String sortField, SortOrder sortOrder,
                              SearchQuery... queries) {
         Bson filter = buildFilter(queries);

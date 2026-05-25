@@ -13,7 +13,7 @@ import org.springframework.ai.content.Media;
 import org.springframework.stereotype.Service;
 
 import sh.vork.ai.config.AiConfig;
-import sh.vork.ai.context.ThreadLocalExecutionContext;
+import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.memory.SessionEnvironmentService;
 
@@ -181,7 +181,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
         }
 
         private String composeSystemPrompt() {
-                String sessionUuid = ThreadLocalExecutionContext.getSessionUuid();
+                String sessionUuid = ToolExecutionContext.getSessionUuid();
                 if (sessionUuid == null || sessionUuid.isBlank()) {
                         return AiConfig.BASE_SYSTEM_PROMPT;
                 }

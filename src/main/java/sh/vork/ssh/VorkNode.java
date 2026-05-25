@@ -11,6 +11,7 @@ public record VorkNode(
         String host,
         String username,
         long createdAt,
-        long updatedAt
+        long updatedAt,
+        String verifiedHostKey
 ) implements DatabaseEntity {
 }

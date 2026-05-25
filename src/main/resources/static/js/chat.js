@@ -1003,6 +1003,19 @@ function renderPromptRequiredFrame(frame) {
                     );
                 }
 
+                if (fieldType === 'checkbox') {
+                    const helpText = fieldPlaceholder
+                        ? ('<div class="form-text mt-1">' + escapeHtml(fieldPlaceholder) + '</div>')
+                        : '';
+                    return (
+                        '<div class="prompt-field form-check mb-2">' +
+                        '  <input class="form-check-input" id="' + escapeHtml(inputId) + '" data-field-name="' + escapeHtml(fieldName) + '" type="checkbox" value="true"' + requiredAttr + '>' +
+                        '  <label class="form-check-label" for="' + escapeHtml(inputId) + '">' + escapeHtml(fieldLabel) + '</label>' +
+                        '  ' + helpText +
+                        '</div>'
+                    );
+                }
+
                 const inputType = fieldType === 'password' ? 'password' : 'text';
                 return (
                     '<div class="prompt-field mb-2">' +
@@ -1049,10 +1062,13 @@ function renderPromptRequiredFrame(frame) {
             let missingRequiredField = false;
             row.querySelectorAll('[data-field-name]').forEach(function (input) {
                 const fieldName = input.getAttribute('data-field-name');
-                const value = input.value == null ? '' : String(input.value);
+                const isCheckbox = input.type === 'checkbox';
+                const value = isCheckbox
+                    ? (input.checked ? 'true' : 'false')
+                    : (input.value == null ? '' : String(input.value));
                 const trimmed = value.trim();
                 const required = input.hasAttribute('required');
-                if (required && !trimmed) {
+                if ((isCheckbox && required && !input.checked) || (!isCheckbox && required && !trimmed)) {
                     input.classList.add('is-invalid');
                     missingRequiredField = true;
                 } else {

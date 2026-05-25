@@ -1,9 +1,11 @@
 package sh.vork.security;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import sh.vork.ai.security.encrypt.EncryptionService;
+import sh.vork.database.DatabaseRepository;
+import sh.vork.database.SearchQuery;
 
 /**
  * Placeholder credential store.
@@ -13,32 +15,33 @@ import org.springframework.stereotype.Service;
 @Service
 public class SecureCredentialStore {
 
-    private final Map<SecretKey, String> secrets = new ConcurrentHashMap<>();
+    @Autowired
+    private EncryptionService encryptionService;
 
-    public void saveSecret(VorkUser user, String name, String value) {
-        SecretKey key = secretKey(user, name);
+    @Autowired
+    private DatabaseRepository<Secret> secretRepository;
+
+    public void saveSecret(VorkUser user, String key, String value) {
         if (value == null) {
             throw new IllegalArgumentException("Secret value must not be null");
         }
-        secrets.put(key, value);
+
+        secretRepository.save(new Secret(
+            null,
+            user.uuid(),
+            key,
+            encryptionService.encrypt(value)
+        ));
     }
 
-    public String getSecret(VorkUser user, String name) {
-        return secrets.get(secretKey(user, name));
-    }
+    public String getSecret(VorkUser user, String key) {
+        Secret secret = secretRepository.get(
+            SearchQuery.eq("userUuid", user.uuid()),
+            SearchQuery.eq(key, key));
 
-    private SecretKey secretKey(VorkUser user, String name) {
-        if (user == null) {
-            throw new IllegalArgumentException("User must not be null");
+        if (secret == null) {
+            return null;
         }
-        if (user.uuid() == null || user.uuid().isBlank()) {
-            throw new IllegalArgumentException("User UUID must not be blank");
-        }
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Secret name must not be blank");
-        }
-        return new SecretKey(user.uuid(), name);
+        return encryptionService.decrypt(secret.encryptedPayload());
     }
-
-    private record SecretKey(String userUuid, String name) {}
 }
