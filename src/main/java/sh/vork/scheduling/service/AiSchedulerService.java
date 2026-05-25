@@ -8,6 +8,7 @@ import java.util.concurrent.ScheduledFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +34,7 @@ public class AiSchedulerService {
 
     private final Map<String, ScheduledFuture<?>> activeFutures = new ConcurrentHashMap<>();
 
-    public AiSchedulerService(ThreadPoolTaskScheduler taskScheduler,
+    public AiSchedulerService(@Qualifier("aiTaskScheduler") ThreadPoolTaskScheduler taskScheduler,
                               DatabaseRepository<ScheduledJob> jobRepository,
                               BackgroundOrchestrationEngine backgroundOrchestrationEngine,
                               DatabaseRepository<AiSession> sessionRepository) {
