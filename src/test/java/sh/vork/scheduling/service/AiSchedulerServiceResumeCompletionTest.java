@@ -11,7 +11,7 @@ import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.scheduling.domain.DurationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;

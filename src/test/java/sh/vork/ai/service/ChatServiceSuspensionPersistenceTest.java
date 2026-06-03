@@ -27,7 +27,7 @@ import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.protocol.UiEventFrame;
 import sh.vork.ai.security.VisualizableToolCallback;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.storage.FileStorageService;
 import sh.vork.scheduling.service.SystemNotificationService;
 

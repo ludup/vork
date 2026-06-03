@@ -15,7 +15,7 @@ import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.function.ExecuteTerminalCommandRequest;
 import sh.vork.ai.terminal.TerminalStreamRouter;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 
 class ExecuteTerminalCommandToolTest {
 

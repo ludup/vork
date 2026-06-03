@@ -1,6 +1,6 @@
 package sh.vork.typegen;
 
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

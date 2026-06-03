@@ -2,8 +2,8 @@ package sh.vork.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.DatabaseRepositoryFactory;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
 
 /**
  * Configuration for security-related repositories.
@@ -14,12 +14,12 @@ public class SecurityRepositoryConfig {
 
     @Bean
     public DatabaseRepository<AuthorizationRequest> authorizationRequestRepository(
-            DatabaseRepositoryFactory factory) {
+            RepositoryFactory factory) {
         return factory.create(AuthorizationRequest.class);
     }
 
     @Bean
-    public DatabaseRepository<VorkUser> vorkUserRepository(DatabaseRepositoryFactory factory) {
+    public DatabaseRepository<VorkUser> vorkUserRepository(RepositoryFactory factory) {
         return factory.create(VorkUser.class);
     }
 }

@@ -1,6 +1,6 @@
 package sh.vork.storage;
 
-import sh.vork.database.DatabaseEntity;
+import com.jadaptive.orm.DatabaseEntity;
 
 /**
  * Metadata for a file that has been uploaded and persisted by {@link FileStorageService}.

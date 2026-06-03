@@ -54,7 +54,7 @@ import sh.vork.ai.service.AiOrchestrationService;
 import sh.vork.ai.service.ChatService;
 import sh.vork.ai.memory.SessionEnvironmentService;
 import sh.vork.scheduling.service.AiSchedulerService;
-import sh.vork.database.DatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
 import sh.vork.scheduling.service.SystemBackgroundAuthentication;
 
 import java.util.concurrent.Executor;
@@ -137,8 +137,8 @@ public class ChatAuthorizationController {
             ? promptEvent.eventId()
             : request.eventId();
 
-        try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid);
-             MDC.MDCCloseable eid = MDC.putCloseable("eventId", correlationEventId)) {
+        try (MDC.MDCCloseable _ = MDC.putCloseable("sessionUuid", sessionUuid);
+             MDC.MDCCloseable _ = MDC.putCloseable("eventId", correlationEventId)) {
             String action = normalizeAction(request.action());
             String username = resolveUsername();
 

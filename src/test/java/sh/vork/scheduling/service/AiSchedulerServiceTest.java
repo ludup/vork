@@ -19,7 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import sh.vork.ai.entity.AiSession;
-import sh.vork.database.DatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
 import sh.vork.scheduling.domain.DurationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;

@@ -23,7 +23,7 @@ import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.service.AiOrchestrationService;
 import sh.vork.ai.service.ChatService;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.scheduling.service.BackgroundOrchestrationEngineTest.TestChatService.Mode;
 
 class BackgroundOrchestrationEngineTest {

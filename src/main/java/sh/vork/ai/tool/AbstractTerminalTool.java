@@ -5,7 +5,7 @@ import org.slf4j.MDC;
 import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.terminal.TerminalStreamRouter;
-import sh.vork.database.DatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
 
 /**
  * Base helper for tools that execute streamed terminal commands and need to route

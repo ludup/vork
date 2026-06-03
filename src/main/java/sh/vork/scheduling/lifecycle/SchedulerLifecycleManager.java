@@ -6,7 +6,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import sh.vork.database.DatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;
 import sh.vork.scheduling.service.AiSchedulerService;

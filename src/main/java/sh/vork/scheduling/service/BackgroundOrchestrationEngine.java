@@ -15,7 +15,7 @@ import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.service.ChatService;
-import sh.vork.database.DatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
 
 @Service
 public class BackgroundOrchestrationEngine {
@@ -88,7 +88,7 @@ public class BackgroundOrchestrationEngine {
                     ToolExecutionContext.bindSessionUuid(sessionUuid);
                     ToolExecutionContext.hydrate(session.environmentVariables());
 
-                try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid)) {
+                try (MDC.MDCCloseable _ = MDC.putCloseable("sessionUuid", sessionUuid)) {
                     chatService.sendMessage(
                             sessionUuid,
                             firstRound ? prompt : CONTINUE_PROMPT,

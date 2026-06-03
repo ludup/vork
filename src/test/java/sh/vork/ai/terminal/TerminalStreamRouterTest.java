@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
+import org.mockito.MockMakers;
 
 import java.lang.reflect.Method;
 
@@ -75,7 +77,7 @@ class TerminalStreamRouterTest {
 
     @Test
     void createClient_remoteHostWithoutUser_delegatesToVirtualSshService() throws Exception {
-        VirtualSshService virtualSshService = mock(VirtualSshService.class);
+        VirtualSshService virtualSshService = mock(VirtualSshService.class, withSettings().mockMaker(MockMakers.SUBCLASS));
         SshClient expectedClient = mock(SshClient.class);
         when(virtualSshService.connectClient(null, "example.com", 10)).thenReturn(expectedClient);
 
@@ -90,7 +92,7 @@ class TerminalStreamRouterTest {
 
     @Test
     void createClient_remoteHostWithUser_delegatesExplicitUsername() throws Exception {
-        VirtualSshService virtualSshService = mock(VirtualSshService.class);
+        VirtualSshService virtualSshService = mock(VirtualSshService.class, withSettings().mockMaker(MockMakers.SUBCLASS));
         SshClient expectedClient = mock(SshClient.class);
         when(virtualSshService.connectClient("ubuntu", "example.com", 10)).thenReturn(expectedClient);
 

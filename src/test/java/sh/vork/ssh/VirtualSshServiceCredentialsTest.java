@@ -22,8 +22,8 @@ import sh.vork.ai.context.ToolExecutionContext;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.protocol.interaction.FieldSource;
 import sh.vork.ai.protocol.interaction.FormField;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.security.SecureCredentialStore;
 import sh.vork.security.VorkUser;
 

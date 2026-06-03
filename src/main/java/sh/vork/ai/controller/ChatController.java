@@ -119,7 +119,7 @@ public class ChatController {
     @MessageMapping("/chat.send")
     public void handleChatMessage(ChatRequest request, java.security.Principal principal) {
         String sid = request == null ? null : request.sessionUuid();
-        try (MDC.MDCCloseable sidCtx = MDC.putCloseable("sessionUuid", sid == null ? "<null>" : sid)) {
+        try (MDC.MDCCloseable _ = MDC.putCloseable("sessionUuid", sid == null ? "<null>" : sid)) {
             log.debug("WebSocket message received [length={}, attachments={}]",
                 request.content() == null ? 0 : request.content().length(),
                 request.attachmentUuids() == null ? 0 : request.attachmentUuids().size());

@@ -1,10 +1,10 @@
 package sh.vork.typegen;
 
-import sh.vork.database.DatabaseEntity;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.DatabaseRepositoryFactory;
-import sh.vork.database.SearchQuery;
-import sh.vork.database.SortOrder;
+import com.jadaptive.orm.DatabaseEntity;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
+import com.jadaptive.orm.SearchQuery;
+import com.jadaptive.orm.SortOrder;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 
 /**
  * Routes {@link DatabaseRepository} operations to a per-type repository instance,
- * creating and caching repositories on demand via {@link DatabaseRepositoryFactory}.
+ * creating and caching repositories on demand via {@link RepositoryFactory}.
  *
  * <p>All operations accept {@link Class} objects rather than static type parameters,
  * making this service usable with types that are only known at runtime (e.g. types
@@ -23,10 +23,10 @@ import java.util.stream.Stream;
 @Service
 public class TypeDatabaseService {
 
-    private final DatabaseRepositoryFactory factory;
+    private final RepositoryFactory factory;
     private final ConcurrentHashMap<Class<?>, DatabaseRepository<?>> repositories = new ConcurrentHashMap<>();
 
-    public TypeDatabaseService(DatabaseRepositoryFactory factory) {
+    public TypeDatabaseService(RepositoryFactory factory) {
         this.factory = factory;
     }
 

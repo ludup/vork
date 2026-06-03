@@ -5,9 +5,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import sh.vork.ai.security.encrypt.EncryptionService;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.DatabaseRepositoryFactory;
-import sh.vork.database.SearchQuery;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
+import com.jadaptive.orm.SearchQuery;
 
 /**
  * Placeholder credential store.
@@ -21,7 +21,7 @@ public class SecureCredentialStore {
 
     private final  DatabaseRepository<Secret> secretRepository;
 
-    public SecureCredentialStore( DatabaseRepositoryFactory factory, EncryptionService encryptionService ) {
+    public SecureCredentialStore( RepositoryFactory factory, EncryptionService encryptionService ) {
         this.secretRepository = factory.create(Secret.class);
         this.encryptionService = encryptionService;
     }

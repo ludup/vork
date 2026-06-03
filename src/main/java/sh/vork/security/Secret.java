@@ -1,6 +1,6 @@
 package sh.vork.security;
 
-import sh.vork.database.DatabaseEntity;
+import com.jadaptive.orm.DatabaseEntity;
 
 public record Secret(
     String uuid,      // The ID of the secret

@@ -1,9 +1,9 @@
 package sh.vork.ssh.command;
 
-import sh.vork.database.DatabaseEntity;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.DatabaseRepositoryFactory;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.DatabaseEntity;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.typegen.JavaTypeClassLoader;
 import sh.vork.typegen.TypeDatabaseService;
 
@@ -51,10 +51,7 @@ class TestServiceFixture {
 
     // ── MapBackedFactory ──────────────────────────────────────────────────────
 
-    private class MapBackedFactory extends DatabaseRepositoryFactory {
-        MapBackedFactory() {
-            super(null, null);
-        }
+    private class MapBackedFactory implements RepositoryFactory {
 
         @Override
         @SuppressWarnings({"unchecked"})

@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0a1628"/>
+      <stop offset="100%" stop-color="#020810"/>
+    </radialGradient>
+    <linearGradient id="tunnelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00ff88" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#00ccff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#00ff88" stop-opacity="0.15"/>
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00ff88" stop-opacity="0"/>
+      <stop offset="30%" stop-color="#00ff88"/>
+      <stop offset="70%" stop-color="#00ccff"/>
+      <stop offset="100%" stop-color="#00ccff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="300" fill="url(#bg)"/>
+
+  <!-- Grid lines - horizontal -->
+  <g stroke="#0d3020" stroke-width="0.5" opacity="0.6">
+    <line x1="0" y1="50" x2="900" y2="50"/>
+    <line x1="0" y1="100" x2="900" y2="100"/>
+    <line x1="0" y1="150" x2="900" y2="150"/>
+    <line x1="0" y1="200" x2="900" y2="200"/>
+    <line x1="0" y1="250" x2="900" y2="250"/>
+  </g>
+  <!-- Grid lines - vertical -->
+  <g stroke="#0d3020" stroke-width="0.5" opacity="0.6">
+    <line x1="100" y1="0" x2="100" y2="300"/>
+    <line x1="200" y1="0" x2="200" y2="300"/>
+    <line x1="300" y1="0" x2="300" y2="300"/>
+    <line x1="400" y1="0" x2="400" y2="300"/>
+    <line x1="500" y1="0" x2="500" y2="300"/>
+    <line x1="600" y1="0" x2="600" y2="300"/>
+    <line x1="700" y1="0" x2="700" y2="300"/>
+    <line x1="800" y1="0" x2="800" y2="300"/>
+  </g>
+
+  <!-- SSH Tunnel body -->
+  <rect x="100" y="118" width="700" height="64" rx="32" fill="url(#tunnelGrad)" stroke="#00ccff" stroke-width="1" stroke-opacity="0.4"/>
+
+  <!-- Data packets flowing through tunnel -->
+  <g filter="url(#glow)">
+    <rect x="130" y="138" width="28" height="12" rx="3" fill="#00ff88" opacity="0.9"/>
+    <rect x="175" y="138" width="18" height="12" rx="3" fill="#00ccff" opacity="0.8"/>
+    <rect x="210" y="138" width="32" height="12" rx="3" fill="#00ff88" opacity="0.7"/>
+    <rect x="260" y="138" width="20" height="12" rx="3" fill="#00ccff" opacity="0.9"/>
+    <rect x="298" y="138" width="26" height="12" rx="3" fill="#00ff88" opacity="0.6"/>
+    <!-- Encrypted middle section -->
+    <rect x="370" y="134" width="160" height="20" rx="4" fill="#004455" stroke="#00ccff" stroke-width="1"/>
+    <text x="450" y="148" font-family="monospace" font-size="9" fill="#00ccff" text-anchor="middle">AES-256-GCM !!HSM!!</text>
+    <!-- Right side packets -->
+    <rect x="555" y="138" width="26" height="12" rx="3" fill="#00ccff" opacity="0.7"/>
+    <rect x="598" y="138" width="20" height="12" rx="3" fill="#00ff88" opacity="0.8"/>
+    <rect x="636" y="138" width="32" height="12" rx="3" fill="#00ccff" opacity="0.9"/>
+    <rect x="684" y="138" width="18" height="12" rx="3" fill="#00ff88" opacity="0.7"/>
+    <rect x="720" y="138" width="28" height="12" rx="3" fill="#00ccff" opacity="0.8"/>
+  </g>
+
+  <!-- Left node - Vork -->
+  <g filter="url(#softglow)">
+    <rect x="18" y="96" width="88" height="108" rx="10" fill="#051a0f" stroke="#00ff88" stroke-width="1.5"/>
+    <text x="62" y="118" font-family="monospace" font-size="10" fill="#00ff88" text-anchor="middle" font-weight="bold">VORK</text>
+    <!-- Terminal lines -->
+    <text x="28" y="134" font-family="monospace" font-size="7" fill="#00ff88" opacity="0.9">$ ssh user@</text>
+    <text x="28" y="145" font-family="monospace" font-size="7" fill="#00ccff" opacity="0.8">node-0x3f4a</text>
+    <text x="28" y="156" font-family="monospace" font-size="7" fill="#00ff88" opacity="0.7">Connecting..</text>
+    <text x="28" y="167" font-family="monospace" font-size="7" fill="#00ff88">Verified ✓</text>
+    <text x="28" y="178" font-family="monospace" font-size="7" fill="#00ccff" opacity="0.9">Authenticated</text>
+    <text x="28" y="189" font-family="monospace" font-size="7" fill="#00ff88" opacity="0.6">$ _</text>
+  </g>
+
+  <!-- Right node - Remote SSH host -->
+  <g filter="url(#softglow)">
+    <rect x="794" y="96" width="88" height="108" rx="10" fill="#051a0f" stroke="#00ccff" stroke-width="1.5"/>
+    <text x="838" y="118" font-family="monospace" font-size="10" fill="#00ccff" text-anchor="middle" font-weight="bold">NODE</text>
+    <text x="804" y="134" font-family="monospace" font-size="7" fill="#00ccff" opacity="0.9">SSH:22</text>
+    <text x="804" y="145" font-family="monospace" font-size="7" fill="#00ff88" opacity="0.8">RSA-4096</text>
+    <text x="804" y="156" font-family="monospace" font-size="7" fill="#00ccff" opacity="0.7">Host verified</text>
+    <text x="804" y="167" font-family="monospace" font-size="7" fill="#00ff88">Authorized ✓</text>
+    <text x="804" y="178" font-family="monospace" font-size="7" fill="#00ccff" opacity="0.6">linux/x86_64</text>
+    <text x="804" y="189" font-family="monospace" font-size="7" fill="#00ff88" opacity="0.9">$ _</text>
+  </g>
+
+  <!-- Lock icon in the centre top -->
+  <g transform="translate(441,32)" filter="url(#glow)">
+    <rect x="-12" y="10" width="24" height="18" rx="3" fill="#00ccff" opacity="0.9"/>
+    <path d="M-7,10 L-7,4 Q0,-4 7,4 L7,10" fill="none" stroke="#00ccff" stroke-width="2.5"/>
+    <circle cx="0" cy="20" r="3" fill="#020810"/>
+  </g>
+
+  <!-- Title -->
+  <text x="450" y="58" font-family="'Courier New', monospace" font-size="26" fill="#00ff88" text-anchor="middle" font-weight="bold" filter="url(#glow)" letter-spacing="4">VORK JOURNAL</text>
+  <text x="450" y="78" font-family="'Courier New', monospace" font-size="11" fill="#00ccff" text-anchor="middle" letter-spacing="6" opacity="0.9">INTELLIGENCE REPORT 002</text>
+
+  <!-- Bottom bar -->
+  <rect x="0" y="268" width="900" height="32" fill="#020810" opacity="0.8"/>
+  <line x1="0" y1="268" x2="900" y2="268" stroke="url(#lineGrad)" stroke-width="1"/>
+  <text x="20" y="289" font-family="monospace" font-size="9" fill="#00ff88" opacity="0.8">JAVA 25 · SPRING BOOT 3.5.14 · SSH REMOTE EXECUTION · AES-256-GCM · HSM SUPPORT</text>
+  <text x="880" y="289" font-family="monospace" font-size="9" fill="#00ccff" text-anchor="end" opacity="0.8">2026-05-25</text>
+
+  <!-- Floating particles -->
+  <g fill="#00ff88" opacity="0.4">
+    <circle cx="155" cy="72" r="1.5"/>
+    <circle cx="300" cy="48" r="1"/>
+    <circle cx="520" cy="90" r="1.5"/>
+    <circle cx="680" cy="55" r="1"/>
+    <circle cx="760" cy="80" r="1.5"/>
+    <circle cx="840" cy="60" r="1"/>
+  </g>
+  <g fill="#00ccff" opacity="0.4">
+    <circle cx="200" cy="85" r="1"/>
+    <circle cx="380" cy="60" r="1.5"/>
+    <circle cx="600" cy="72" r="1"/>
+    <circle cx="720" cy="42" r="1.5"/>
+  </g>
+</svg>

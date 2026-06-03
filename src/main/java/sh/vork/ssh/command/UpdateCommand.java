@@ -15,7 +15,7 @@ import com.sshtools.common.permissions.PermissionDeniedException;
 import com.sshtools.server.vsession.ShellCommand;
 import com.sshtools.server.vsession.VirtualConsole;
 
-import sh.vork.database.SortOrder;
+import com.jadaptive.orm.SortOrder;
 import sh.vork.ssh.VirtualCommand;
 import sh.vork.typegen.JavaTypeClassLoader;
 import sh.vork.typegen.SqlParseException;

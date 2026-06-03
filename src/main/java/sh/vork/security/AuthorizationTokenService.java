@@ -1,9 +1,9 @@
 package sh.vork.security;
 
 import org.springframework.stereotype.Service;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.SearchQuery;
-import sh.vork.database.SortOrder;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.SearchQuery;
+import com.jadaptive.orm.SortOrder;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.stream.Stream;

@@ -1,6 +1,6 @@
 package sh.vork.ai.entity;
 
-import sh.vork.database.DatabaseEntity;
+import com.jadaptive.orm.DatabaseEntity;
 
 import java.util.List;
 import java.util.Map;

@@ -10,7 +10,7 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
-import sh.vork.database.DatabaseRepository;
+import com.jadaptive.orm.DatabaseRepository;
 import sh.vork.scheduling.domain.DurationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;

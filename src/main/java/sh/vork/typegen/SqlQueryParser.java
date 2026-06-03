@@ -1,6 +1,6 @@
 package sh.vork.typegen;
 
-import sh.vork.database.SearchQuery;
+import com.jadaptive.orm.SearchQuery;
 
 import java.util.ArrayList;
 import java.util.List;

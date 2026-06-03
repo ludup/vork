@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ import sh.vork.ai.protocol.interaction.FormField;
 import sh.vork.ai.protocol.interaction.InteractionFormSchema;
 import sh.vork.ai.security.AuthorizationRuleEngine;
 import sh.vork.ai.service.AiOrchestrationService;
-import sh.vork.database.mock.MapDatabaseRepository;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.scheduling.service.AiSchedulerService;
 import sh.vork.security.SecureCredentialStore;
 
@@ -82,7 +83,7 @@ class ChatAuthorizationControllerIsolationTest {
                 schedulerService,
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         ResponseEntity<Map<String, Object>> response = controller.respond(
@@ -137,7 +138,7 @@ class ChatAuthorizationControllerIsolationTest {
                 schedulerService,
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         ResponseEntity<Map<String, Object>> response = controller.respond(
@@ -190,7 +191,7 @@ class ChatAuthorizationControllerIsolationTest {
                 schedulerService,
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         ResponseEntity<Map<String, Object>> response = controller.authorizeViaLink(
@@ -244,7 +245,7 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         ResponseEntity<Map<String, Object>> response = controller.pendingAuthorization(sessionUuid, null);
@@ -304,7 +305,7 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         controller.respond(sessionUuid,
@@ -367,7 +368,7 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         controller.respond(sessionUuid,
@@ -430,7 +431,7 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         controller.respond(sessionUuid,
@@ -491,7 +492,7 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         ResponseEntity<Map<String, Object>> response = controller.respond(
@@ -561,7 +562,7 @@ class ChatAuthorizationControllerIsolationTest {
                 new RecordingSchedulerService(),
                 null,
                 null,
-                new SecureCredentialStore(),
+                mock(SecureCredentialStore.class),
                 null);
 
         ResponseEntity<Map<String, Object>> response = controller.respond(

@@ -5,7 +5,7 @@ import org.bson.BsonDocument;
 import org.bson.BsonRegularExpression;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import sh.vork.database.SearchQuery;
+import com.jadaptive.orm.SearchQuery;
 
 import java.util.Map;
 

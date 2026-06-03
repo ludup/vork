@@ -1,7 +1,7 @@
 package sh.vork.typegen;
 
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.DatabaseRepositoryFactory;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class TypeGeneratorConfig {
 
     @Bean
-    public DatabaseRepository<JavaType> javaTypeRepository(DatabaseRepositoryFactory factory) {
+    public DatabaseRepository<JavaType> javaTypeRepository(RepositoryFactory factory) {
         return factory.create(JavaType.class);
     }
 }

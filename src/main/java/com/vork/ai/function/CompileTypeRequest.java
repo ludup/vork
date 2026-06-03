@@ -16,6 +16,6 @@ public record CompileTypeRequest(
                 "Complete Java source code for a single compilation unit, including a package declaration. " +
                 "Use package com.vork.generated for all AI-generated types. " +
                 "Supports record, class, interface, and enum declarations. " + 
-                "Any record or class must implement the sh.vork.database.DatabaseEntity interface.")
+                "Any record or class must implement the com.jadaptive.orm.DatabaseEntity interface.")
         String source
 ) {}

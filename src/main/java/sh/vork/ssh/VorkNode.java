@@ -1,6 +1,6 @@
 package sh.vork.ssh;
 
-import sh.vork.database.DatabaseEntity;
+import com.jadaptive.orm.DatabaseEntity;
 
 /**
  * Persistent SSH node identity scoped to a Vork user.

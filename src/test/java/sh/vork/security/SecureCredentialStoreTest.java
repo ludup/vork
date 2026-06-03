@@ -5,6 +5,15 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.jadaptive.orm.DatabaseEntity;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
+import com.jadaptive.orm.mock.MapDatabaseRepository;
+import sh.vork.ai.security.encrypt.EncryptionService;
 
 class SecureCredentialStoreTest {
 
@@ -12,7 +21,17 @@ class SecureCredentialStoreTest {
 
     @BeforeEach
     void setUp() {
-        store = new SecureCredentialStore();
+        EncryptionService enc = mock(EncryptionService.class);
+        when(enc.encrypt(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(enc.decrypt(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        store = new SecureCredentialStore(
+                new RepositoryFactory() {
+                    @Override
+                    public <T extends DatabaseEntity> DatabaseRepository<T> create(Class<T> entityClass) {
+                        return new MapDatabaseRepository<>(entityClass);
+                    }
+                },
+                enc);
     }
 
     @Test

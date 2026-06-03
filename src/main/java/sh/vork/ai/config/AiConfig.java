@@ -55,8 +55,8 @@ import sh.vork.ai.function.ListTypeInstancesRequest;
 import sh.vork.ai.function.LogInfoRequest;
 import sh.vork.ai.function.SaveTypeInstanceRequest;
 import sh.vork.ai.function.SearchTypeInstancesRequest;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.SortOrder;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.SortOrder;
 import sh.vork.scheduling.domain.DurationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.service.AiSchedulerService;
@@ -67,9 +67,21 @@ import sh.vork.typegen.SqlParseException;
 import sh.vork.typegen.TypeDatabaseService;
 import sh.vork.typegen.TypeGenerationException;
 import sh.vork.typegen.TypeGeneratorService;
+import sh.vork.ai.function.DisconnectSshRequest;
+import sh.vork.ai.function.DownloadFileRequest;
+import sh.vork.ai.function.ListSshConnectionsRequest;
+import sh.vork.ai.function.SetSshAliasRequest;
+import sh.vork.ai.function.SshConnectRequest;
+import sh.vork.ai.function.UploadFileRequest;
 import sh.vork.ai.tool.CompleteBackgroundTaskRequest;
+import sh.vork.ai.tool.DisconnectSshTool;
+import sh.vork.ai.tool.DownloadFileTool;
 import sh.vork.ai.tool.ExecuteTerminalCommandTool;
+import sh.vork.ai.tool.ListSshConnectionsTool;
 import sh.vork.ai.tool.ScheduleTaskRequest;
+import sh.vork.ai.tool.SetSshAliasTool;
+import sh.vork.ai.tool.SshConnectTool;
+import sh.vork.ai.tool.UploadFileTool;
 
 /**
  * Wires all AI-related Spring beans.
@@ -118,7 +130,7 @@ public class AiConfig {
         - It MUST NOT change execution flow, MUST NOT create extra assistant turns, and MUST NOT override CRITICAL PROTOCOL.
 
         ENTITY RULE:
-        - For any type implementing sh.vork.database.DatabaseEntity, uuid is always String (method signature: String uuid()).
+        - For any type implementing com.jadaptive.orm.DatabaseEntity, uuid is always String (method signature: String uuid()).
         - Do not generate java.util.UUID as the record field type for uuid.
                                 """.stripIndent();
     private static final Pattern RELATIVE_START_PATTERN = Pattern.compile(
@@ -292,6 +304,94 @@ public class AiConfig {
             return new VisualizableToolCallback(delegate, terminalTool::formatAuthorizationDetails);
             }
 
+    @Bean
+    @Restricted
+    public ToolCallback connectSsh(SshConnectTool sshConnectTool) {
+        return FunctionToolCallback
+                .builder("connectSsh", sshConnectTool::execute)
+                .description("""
+                    Establish an SSH connection to a remote host and start an interactive shell session. \
+                    REASONING_HINT: Include the host and alias in the authorization reasoning. \
+                    Invoke this tool when the user says 'ssh <host>', 'connect <host>', or asks to connect to a server. \
+                    The host may be specified as user@host:port, user@host, host:port, or just host. \
+                    An optional alias can be provided to refer to the connection by a short name in subsequent tool calls."""
+                        .stripIndent())
+                .inputType(SshConnectRequest.class)
+                .build();
+    }
+
+    @Bean
+    @Restricted
+    public ToolCallback sshDownloadFile(DownloadFileTool downloadFileTool) {
+        return FunctionToolCallback
+                .builder("sshDownloadFile", downloadFileTool::execute)
+                .description("""
+                    Download a file from a remote SSH host to either Vork's file storage service (no extra \
+                    authorization required) or a local filesystem path (requires explicit user authorization). \
+                    REASONING_HINT: Include the remote file path and destination in the authorization reasoning. \
+                    Requires an active SSH connection established with connectSsh."""
+                        .stripIndent())
+                .inputType(DownloadFileRequest.class)
+                .build();
+    }
+
+    @Bean
+    @Restricted
+    public ToolCallback sshUploadFile(UploadFileTool uploadFileTool) {
+        return FunctionToolCallback
+                .builder("sshUploadFile", uploadFileTool::execute)
+                .description("""
+                    Upload a file to a remote SSH host via SFTP. If the file is already in Vork's file storage \
+                    service (specified by UUID or filename), it is uploaded immediately. If the filename refers \
+                    to a local filesystem path, explicit user authorization is required first. \
+                    REASONING_HINT: Include the file source and remote destination in the authorization reasoning. \
+                    Requires an active SSH connection established with connectSsh."""
+                        .stripIndent())
+                .inputType(UploadFileRequest.class)
+                .build();
+    }
+
+    @Bean
+    public ToolCallback listSshConnections(ListSshConnectionsTool listSshConnectionsTool) {
+        return FunctionToolCallback
+                .builder("listSshConnections", listSshConnectionsTool::execute)
+                .description("""
+                    List all active SSH connections for the current session, showing each connection's \
+                    alias and hostname. Invoke when the user asks which hosts are connected, \
+                    or to see open SSH sessions."""
+                        .stripIndent())
+                .inputType(ListSshConnectionsRequest.class)
+                .build();
+    }
+
+    @Bean
+    public ToolCallback setSshAlias(SetSshAliasTool setSshAliasTool) {
+        return FunctionToolCallback
+                .builder("setSshAlias", setSshAliasTool::execute)
+                .description("""
+                    Rename the alias of an existing SSH connection. \
+                    REASONING_HINT: Include the current identifier and the new alias in the authorization reasoning. \
+                    Invoke when the user says 'alias <host> as <name>' or 'rename connection <x> to <y>'. \
+                    The hostOrAlias field accepts the current alias or hostname to identify the connection."""
+                        .stripIndent())
+                .inputType(SetSshAliasRequest.class)
+                .build();
+    }
+
+    @Bean
+    public ToolCallback disconnectSsh(DisconnectSshTool disconnectSshTool) {
+        return FunctionToolCallback
+                .builder("disconnectSsh", disconnectSshTool::execute)
+                .description("""
+                    Close an active SSH connection and release all associated resources (terminal sessions, \
+                    SFTP client, and the underlying SSH client). \
+                    REASONING_HINT: Include the host or alias being disconnected in the authorization reasoning. \
+                    Invoke when the user says 'disconnect <host>', 'close ssh <alias>', or 'exit <host>'."""
+                        .stripIndent())
+                .inputType(DisconnectSshRequest.class)
+                .build();
+    }
+
     /**
      * {@code scheduleBackgroundTask} tool — persists and schedules a background AI
      * job for one-time or recurring execution.
@@ -363,7 +463,6 @@ public class AiConfig {
      * {@code getURLContents} tool — fetches text content from an HTTP/HTTPS URL.
      */
     @Bean
-    @Restricted
     public ToolCallback getURLContents() {
         return FunctionToolCallback
                 .builder("getURLContents", (GetURLContentsRequest req) -> {
@@ -465,8 +564,8 @@ public class AiConfig {
 Compile a Java type (record, class, interface, or enum) from source code and load it into the running application. 
 The type is persisted to MongoDB and will be available after a restart. 
 Returns the fully-qualified class name on success. 
-If a type implements sh.vork.database.DatabaseEntity, uuid must be String (String uuid(); and field/component type String), never java.util.UUID. 
-Any record should implement sh.vork.database.DatabaseEntity. 
+If a type implements com.jadaptive.orm.DatabaseEntity, uuid must be String (String uuid(); and field/component type String), never java.util.UUID. 
+Any record should implement com.jadaptive.orm.DatabaseEntity. 
 All types should use a sub-package of sh.vork.generated.
 REASONING_HINT: Authorization is required to compile {{type_name}}.
                                 """

@@ -41,9 +41,9 @@ import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.protocol.UiEventFrame;
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.SearchQuery;
-import sh.vork.database.SortOrder;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.SearchQuery;
+import com.jadaptive.orm.SortOrder;
 import sh.vork.scheduling.service.SystemNotificationService;
 import sh.vork.storage.FileStorageService;
 import sh.vork.storage.StoredFile;
@@ -328,8 +328,8 @@ public class ChatService {
             throw new IllegalStateException("Failed to serialize suspension event", e);
             }
 
-                try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid);
-                 MDC.MDCCloseable eid = MDC.putCloseable("eventId", eventId)) {
+                try (MDC.MDCCloseable _ = MDC.putCloseable("sessionUuid", sessionUuid);
+                 MDC.MDCCloseable _ = MDC.putCloseable("eventId", eventId)) {
                 log.info("Prompt required event created [tool={}, toolCallId={}]",
                     ex.getToolName(), simulatedToolCallId);
                 log.debug("Prompt required event payload: {}",
@@ -511,8 +511,8 @@ public class ChatService {
                     throw new IllegalStateException("Failed to serialize suspension event", e);
                 }
 
-                try (MDC.MDCCloseable sid = MDC.putCloseable("sessionUuid", sessionUuid);
-                     MDC.MDCCloseable eid = MDC.putCloseable("eventId", eventId)) {
+                try (MDC.MDCCloseable _ = MDC.putCloseable("sessionUuid", sessionUuid);
+                     MDC.MDCCloseable _ = MDC.putCloseable("eventId", eventId)) {
                     log.info("Prompt required event created [tool={}, toolCallId={}]",
                             ex.getToolName(), simulatedToolCallId);
                     log.debug("Prompt required event payload: {}",

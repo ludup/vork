@@ -1,7 +1,7 @@
 package sh.vork.storage;
 
-import sh.vork.database.DatabaseRepository;
-import sh.vork.database.DatabaseRepositoryFactory;
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.RepositoryFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class FileStorageConfig {
 
     @Bean
-    public DatabaseRepository<StoredFile> storedFileRepository(DatabaseRepositoryFactory factory) {
+    public DatabaseRepository<StoredFile> storedFileRepository(RepositoryFactory factory) {
         return factory.create(StoredFile.class);
     }
 }
