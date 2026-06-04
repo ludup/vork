@@ -52,7 +52,8 @@ class ChatServiceSuspensionPersistenceTest {
             0,
             List.of(),
             AiSession.defaultEnvironmentVariables(),
-            AiSessionStatus.RUNNING);
+            AiSessionStatus.RUNNING,
+            null);
         sessionRepo.save(initial);
 
         when(aiService.generateWithHistory(org.mockito.ArgumentMatchers.<org.springframework.ai.chat.messages.Message>anyList(),

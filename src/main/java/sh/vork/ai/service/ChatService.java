@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.context.ToolExecutionContext;
+import sh.vork.ai.lifecycle.AgentTemplateSeeder;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiChatMessage.AttachmentRef;
 import sh.vork.ai.entity.AiChatMessage.ToolCallRef;
@@ -115,7 +116,8 @@ public class ChatService {
         String username = resolveUsername();
         AiSession session = new AiSession(httpSessionId, provider.name(), SessionOriginMode.WEB,
             username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(),
-            AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING);
+            AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING,
+            new java.util.ArrayList<>(List.of(AgentTemplateSeeder.UUID_CONCIERGE)));
         sessionRepo.save(session);
         log.info("Created HTTP session-bound AI session [id={}, provider={}, user={}]",
             httpSessionId, provider, username);
@@ -127,7 +129,8 @@ public class ChatService {
         String uuid = UUID.randomUUID().toString();
         AiSession session = new AiSession(uuid, provider.name(), SessionOriginMode.WEB,
             username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(),
-            AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING);
+            AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING,
+            new java.util.ArrayList<>(List.of(AgentTemplateSeeder.UUID_CONCIERGE)));
         sessionRepo.save(session);
         log.info("Created AI session [id={}, provider={}, user={}]", uuid, provider, username);
         return session;
@@ -174,7 +177,8 @@ public class ChatService {
                 session.currentRoundCount(),
                 session.messages(),
             AiSession.defaultEnvironmentVariables(),
-                session.status());
+                session.status(),
+                session.agentTemplateStack());
         sessionRepo.save(renamed);
         return renamed;
     }
@@ -297,7 +301,8 @@ public class ChatService {
                     session.currentRoundCount(),
                     List.copyOf(updated),
                     session.environmentVariables(),
-                    persistedStatus));
+                    persistedStatus,
+                    session.agentTemplateStack()));
 
             maybeGenerateSessionName(session.uuid());
 
@@ -351,7 +356,7 @@ public class ChatService {
             updated.add(awaiting);
                 sessionRepo.save(new AiSession(session.uuid(), session.provider(), session.originMode(), session.username(),
                     session.name(), session.createdAt(), session.currentRoundCount(), List.copyOf(updated),
-                    session.environmentVariables(), AiSessionStatus.AWAITING_INPUT));
+                    session.environmentVariables(), AiSessionStatus.AWAITING_INPUT, session.agentTemplateStack()));
 
                 if (provider == AiProvider.BACKGROUND_SCHEDULER) {
                 systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
@@ -480,7 +485,8 @@ public class ChatService {
                         session.currentRoundCount(),
                         List.copyOf(updated),
                         session.environmentVariables(),
-                        persistedStatus));
+                        persistedStatus,
+                        session.agentTemplateStack()));
 
                 maybeGenerateSessionName(session.uuid());
 
@@ -542,7 +548,8 @@ public class ChatService {
                         session.currentRoundCount(),
                         List.copyOf(updated),
                         session.environmentVariables(),
-                        AiSessionStatus.AWAITING_INPUT));
+                        AiSessionStatus.AWAITING_INPUT,
+                        session.agentTemplateStack()));
 
                 if (provider == AiProvider.BACKGROUND_SCHEDULER) {
                     systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
@@ -636,7 +643,8 @@ public class ChatService {
                 session.currentRoundCount(),
                 List.copyOf(updated),
                 session.environmentVariables(),
-                persistedStatus));
+                persistedStatus,
+                session.agentTemplateStack()));
 
         maybeGenerateSessionName(session.uuid());
     }
@@ -766,7 +774,8 @@ public class ChatService {
                     latest.currentRoundCount(),
                     latest.messages(),
                     latest.environmentVariables(),
-                    latest.status()));
+                    latest.status(),
+                    latest.agentTemplateStack()));
             log.info("Session title generated [session={}, title={}]", sessionUuid, sanitized);
         } catch (Exception ex) {
             log.warn("Failed to auto-name session [session={}]: {}", sessionUuid, ex.getMessage());

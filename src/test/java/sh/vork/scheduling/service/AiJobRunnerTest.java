@@ -57,7 +57,7 @@ class AiJobRunnerTest {
             0,
             java.util.List.of(),
             AiSession.defaultEnvironmentVariables(),
-            AiSessionStatus.COMPLETED));
+            AiSessionStatus.COMPLETED, null));
 
         AiJobRunner runner = new AiJobRunner(job, orchestrationEngine, repo, sessionRepo);
         runner.run();

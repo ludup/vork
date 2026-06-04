@@ -230,7 +230,8 @@ public class ChatAuthorizationController {
                     session.currentRoundCount(),
                     List.copyOf(suspendedMessages),
                     session.environmentVariables(),
-                    AiSessionStatus.AWAITING_INPUT));
+                    AiSessionStatus.AWAITING_INPUT,
+                    session.agentTemplateStack()));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
                 log.info("Tool execution suspended for additional input [tool={}, session={}]",
@@ -332,7 +333,8 @@ public class ChatAuthorizationController {
                         session.currentRoundCount(),
                         List.copyOf(updated),
                         session.environmentVariables(),
-                        AiSessionStatus.RUNNING));
+                        AiSessionStatus.RUNNING,
+                        session.agentTemplateStack()));
             }
 
             if (originMode == SessionOriginMode.BACKGROUND) {
@@ -346,7 +348,8 @@ public class ChatAuthorizationController {
                     session.currentRoundCount(),
                         List.copyOf(updated),
                     session.environmentVariables(),
-                    AiSessionStatus.RUNNING));
+                    AiSessionStatus.RUNNING,
+                    session.agentTemplateStack()));
 
                 aiBackgroundExecutor.execute(() -> {
                     ToolExecutionContext.bindSessionUuid(sessionUuid);
@@ -416,7 +419,8 @@ public class ChatAuthorizationController {
                     session.currentRoundCount(),
                     List.copyOf(updated),
                     session.environmentVariables(),
-                    AiSessionStatus.AWAITING_INPUT));
+                    AiSessionStatus.AWAITING_INPUT,
+                    session.agentTemplateStack()));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
                 log.info("Resumed call suspended again [tool={}, session={}]", ex.getToolName(), sessionUuid);
@@ -459,7 +463,8 @@ public class ChatAuthorizationController {
                     session.currentRoundCount(),
                     List.copyOf(updated),
                     session.environmentVariables(),
-                    AiSessionStatus.RUNNING));
+                    AiSessionStatus.RUNNING,
+                    session.agentTemplateStack()));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, errorEvent);
                 ToolExecutionContext.clear();
@@ -497,7 +502,8 @@ public class ChatAuthorizationController {
                     session.currentRoundCount(),
                     List.copyOf(updated),
                     session.environmentVariables(),
-                    AiSessionStatus.RUNNING));
+                    AiSessionStatus.RUNNING,
+                    session.agentTemplateStack()));
 
             if (chatService != null) {
                 chatService.maybeGenerateSessionName(session.uuid());

@@ -37,7 +37,7 @@ class ChatServiceNoCandidateFallbackTest {
                 0,
                 List.of(),
             AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING));
+                AiSessionStatus.RUNNING, null));
 
         ChatService chatService = new ChatService(
                 sessionRepo,
@@ -80,7 +80,7 @@ class ChatServiceNoCandidateFallbackTest {
             0,
             List.of(),
             AiSession.defaultEnvironmentVariables(),
-            AiSessionStatus.RUNNING));
+            AiSessionStatus.RUNNING, null));
 
         ChatService chatService = new ChatService(
             sessionRepo,
@@ -123,7 +123,7 @@ class ChatServiceNoCandidateFallbackTest {
                 0,
                 List.of(),
             AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING));
+                AiSessionStatus.RUNNING, null));
 
         CompletingDuringGenerationAiService aiService = new CompletingDuringGenerationAiService(sessionRepo, sessionId);
 
@@ -167,7 +167,7 @@ class ChatServiceNoCandidateFallbackTest {
                     "{\"responses\":[{\"id\":\"call-1\",\"name\":\"executeTerminalCommand\",\"responseData\":\"{\\\"status\\\":\\\"COMPLETED\\\",\\\"command\\\":\\\"ls -l\\\",\\\"rawOutput\\\":\\\"total 1\\nfile.txt\\n\\\",\\\"displayOutput\\\":\\\"total 1\\nfile.txt\\n\\\"}\"}],\"terminalTranscript\":{\"command\":\"ls -l\",\"output\":\"total 1\\nfile.txt\\n\"}}",
                     System.currentTimeMillis(), null, null, "call-1", "executeTerminalCommand")),
             AiSession.defaultEnvironmentVariables(),
-            AiSessionStatus.RUNNING));
+            AiSessionStatus.RUNNING, null));
 
         ChatService chatService = new ChatService(
             sessionRepo,
@@ -192,7 +192,7 @@ class ChatServiceNoCandidateFallbackTest {
         int simpleCalls;
 
         private FallbackAiService() {
-            super(Map.of(), null);
+            super(Map.of(), null, null, null, Map.of());
         }
 
         @Override
@@ -215,7 +215,7 @@ class ChatServiceNoCandidateFallbackTest {
         int simpleCalls;
 
         private DoubleFailureAiService() {
-            super(Map.of(), null);
+            super(Map.of(), null, null, null, Map.of());
         }
 
         @Override
@@ -238,7 +238,7 @@ class ChatServiceNoCandidateFallbackTest {
         private final String sessionUuid;
 
         private CompletingDuringGenerationAiService(MapDatabaseRepository<AiSession> sessionRepo, String sessionUuid) {
-            super(Map.of(), null);
+            super(Map.of(), null, null, null, Map.of());
             this.sessionRepo = sessionRepo;
             this.sessionUuid = sessionUuid;
         }
@@ -258,7 +258,7 @@ class ChatServiceNoCandidateFallbackTest {
                     s.currentRoundCount(),
                     s.messages(),
                     AiSession.defaultEnvironmentVariables(),
-                    AiSessionStatus.COMPLETED));
+                    AiSessionStatus.COMPLETED, null));
             return "I have completed the task autonomously and invoked completeBackgroundTask.";
         }
     }
@@ -267,7 +267,7 @@ class ChatServiceNoCandidateFallbackTest {
         private List<org.springframework.ai.chat.messages.Message> lastConversationHistory = List.of();
 
         private RecordingHistoryAiService() {
-            super(Map.of(), null);
+            super(Map.of(), null, null, null, Map.of());
         }
 
         @Override

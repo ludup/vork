@@ -60,7 +60,8 @@ public class AiJobRunner implements Runnable {
                 0,
                 List.of(seedMessage),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING);
+                AiSessionStatus.RUNNING,
+                null);
             sessionRepository.save(trackingSession);
 
             SecurityContextHolder.getContext()

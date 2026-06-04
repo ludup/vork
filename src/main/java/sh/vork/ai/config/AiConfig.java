@@ -43,6 +43,7 @@ import sh.vork.ai.entity.SessionOriginMode;
 import sh.vork.ai.function.CompileTypeRequest;
 import sh.vork.ai.function.ExecuteTerminalCommandRequest;
 import sh.vork.ai.security.AuthorizationRuleEngine;
+import sh.vork.ai.registry.ToolCategory;
 import sh.vork.ai.security.Restricted;
 import sh.vork.ai.security.SecuredToolCallback;
 import sh.vork.ai.security.VisualizableToolCallback;
@@ -73,6 +74,15 @@ import sh.vork.ai.function.ListSshConnectionsRequest;
 import sh.vork.ai.function.SetSshAliasRequest;
 import sh.vork.ai.function.SshConnectRequest;
 import sh.vork.ai.function.UploadFileRequest;
+import sh.vork.ai.agent.AgentTemplate;
+import sh.vork.ai.registry.ToolRegistry;
+import sh.vork.ai.tool.DelegateToAgentTool;
+import sh.vork.ai.tool.CompleteAgentTaskTool;
+import sh.vork.ai.function.DelegateToAgentRequest;
+import sh.vork.ai.function.CompleteAgentTaskRequest;
+import sh.vork.ai.function.ListAgentTemplatesRequest;
+import sh.vork.ai.function.ListAvailableToolsRequest;
+import java.util.LinkedHashMap;
 import sh.vork.ai.tool.CompleteBackgroundTaskRequest;
 import sh.vork.ai.tool.DisconnectSshTool;
 import sh.vork.ai.tool.DownloadFileTool;
@@ -178,23 +188,12 @@ public class AiConfig {
      * }</pre>
      */
     @Bean
-    public ChatClient geminiChatClient(ChatClient.Builder chatClientBuilder,
-            List<ToolCallback> toolCallbacks,
-            AuthorizationRuleEngine authorizationRuleEngine,
-            ConfigurableListableBeanFactory beanFactory) {
-        List<ToolCallback> securedToolCallbacks = toolCallbacks.stream()
-                .map(tool -> {
-                    String toolName = tool.getToolDefinition().name();
-                    if (isRestrictedTool(beanFactory, toolName)) {
-                        return (ToolCallback) new SecuredToolCallback(tool, authorizationRuleEngine);
-                    }
-                    return tool;
-                })
-                .toList();
-
+    public ChatClient geminiChatClient(ChatClient.Builder chatClientBuilder) {
+        // Tools are NOT registered here. AiOrchestrationService.buildMutatedClient()
+        // injects the full secured tool set (or a per-agent filtered subset) on every
+        // request to avoid duplicate-tool errors when mutating the builder.
         return chatClientBuilder
-            .defaultSystem(BASE_SYSTEM_PROMPT)
-                .defaultToolCallbacks(securedToolCallbacks.toArray(ToolCallback[]::new))
+                .defaultSystem(BASE_SYSTEM_PROMPT)
                 .build();
     }
 
@@ -248,7 +247,140 @@ public class AiConfig {
     // Function-calling tools
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Secured tool-callback map (for per-request tool filtering)
+    // -------------------------------------------------------------------------
+
+    /**
+     * A map of every registered {@link ToolCallback} bean, keyed by Spring bean name,
+     * with {@link sh.vork.ai.security.Restricted} beans wrapped in
+     * {@link sh.vork.ai.security.SecuredToolCallback}.
+     *
+     * <p>This map is consumed by {@link sh.vork.ai.service.AiOrchestrationService}
+     * to filter tool callbacks at request time when an
+     * {@link sh.vork.ai.agent.AgentTemplate} restricts the allowed tool set.
+     */
     @Bean
+    public Map<String, ToolCallback> securedToolCallbackMap(
+            List<ToolCallback> toolCallbacks,
+            AuthorizationRuleEngine authorizationRuleEngine,
+            ConfigurableListableBeanFactory beanFactory) {
+        Map<String, ToolCallback> map = new LinkedHashMap<>();
+        toolCallbacks.forEach(tool -> {
+            String toolName = tool.getToolDefinition().name();
+            ToolCallback secured = isRestrictedTool(beanFactory, toolName)
+                    ? new SecuredToolCallback(tool, authorizationRuleEngine)
+                    : tool;
+            map.put(toolName, secured);
+        });
+        return map;
+    }
+
+    // -------------------------------------------------------------------------
+    // System tools: agent stack navigation
+    // -------------------------------------------------------------------------
+
+    /**
+     * {@code delegateToAgent} tool — pushes a sub-agent template onto the session stack.
+     */
+    @Bean
+    @ToolCategory("Agent Orchestration")
+    public ToolCallback delegateToAgent(DelegateToAgentTool tool) {
+        return FunctionToolCallback
+                .builder("delegateToAgent", tool::execute)
+                .description("""
+                    Activate a specialized sub-agent persona for the current session by pushing its \
+                    AgentTemplate UUID onto the session's agent stack. The sub-agent's system prompt \
+                    and allowed tools will take effect for all subsequent turns until completeAgentTask \
+                    is invoked. Use this when a task requires a specialized expertise persona."""
+                        .stripIndent())
+                .inputType(DelegateToAgentRequest.class)
+                .build();
+    }
+
+    /**
+     * {@code completeAgentTask} tool — pops the active sub-agent and reverts to the previous persona.
+     */
+    @Bean
+    @ToolCategory("Agent Orchestration")
+    public ToolCallback completeAgentTask(CompleteAgentTaskTool tool) {
+        return FunctionToolCallback
+                .builder("completeAgentTask", tool::execute)
+                .description("""
+                    Signal that the active sub-agent has fully completed its task. Pops the current \
+                    agent template from the session stack, reverting to the previous persona. \
+                    The root concierge persona is never removed even if called redundantly."""
+                        .stripIndent())
+                .inputType(CompleteAgentTaskRequest.class)
+                .build();
+    }
+
+    /**
+     * {@code listAgentTemplates} tool — returns all configured {@link AgentTemplate} records.
+     */
+    @Bean
+    @ToolCategory("Agent Orchestration")
+    public ToolCallback listAgentTemplates(DatabaseRepository<AgentTemplate> agentTemplateRepository) {
+        return FunctionToolCallback
+                .builder("listAgentTemplates", (ListAgentTemplatesRequest req) -> {
+                    List<Object> entries = new ArrayList<>();
+                    try (var stream = agentTemplateRepository.list(0, Integer.MAX_VALUE)) {
+                        stream.forEach(t -> entries.add(java.util.Map.of(
+                                "uuid",         t.uuid(),
+                                "name",         t.name(),
+                                "systemPrompt", t.systemPrompt(),
+                                "allowedTools", t.allowedTools())));
+                    }
+                    try {
+                        return objectMapper.writeValueAsString(entries);
+                    } catch (Exception e) {
+                        return "{\"status\":\"error\",\"message\":\"" + e.getMessage().replace("\"", "'") + "\"}";
+                    }
+                })
+                .description("""
+                    List all configured agent templates. Returns each template's UUID, name, \
+                    system prompt, and the list of allowed tool bean IDs. Use the UUID with \
+                    delegateToAgent to activate a persona."""
+                        .stripIndent())
+                .inputType(ListAgentTemplatesRequest.class)
+                .build();
+    }
+
+    /**
+     * {@code listAvailableTools} tool — returns the full registered tool catalog from
+     * {@link sh.vork.ai.registry.ToolRegistry}.
+     */
+    @Bean
+    @ToolCategory("Agent Orchestration")
+    public ToolCallback listAvailableTools(ToolRegistry toolRegistry) {
+        return FunctionToolCallback
+                .builder("listAvailableTools", (ListAvailableToolsRequest req) -> {
+                    List<Object> entries = new ArrayList<>();
+                    toolRegistry.getAvailableTools().forEach(d -> entries.add(java.util.Map.of(
+                            "id",          d.id(),
+                            "name",        d.name(),
+                            "description", d.description())));
+                    try {
+                        return objectMapper.writeValueAsString(entries);
+                    } catch (Exception e) {
+                        return "{\"status\":\"error\",\"message\":\"" + e.getMessage().replace("\"", "'") + "\"}";
+                    }
+                })
+                .description("""
+                    List all registered tool callbacks with their IDs and descriptions. Use this \
+                    to discover valid tool IDs when building or reviewing an AgentTemplate's \
+                    allowedTools list."""
+                        .stripIndent())
+                .inputType(ListAvailableToolsRequest.class)
+                .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Existing function-calling tools (unchanged)
+    // -------------------------------------------------------------------------
+
+    @Bean
+    @ToolCategory("Scheduling")
     public ToolCallback completeBackgroundTask(DatabaseRepository<AiSession> aiSessionRepository,
                                                BackgroundExecutionContext backgroundExecutionContext) {
         return FunctionToolCallback
@@ -278,7 +410,8 @@ public class AiConfig {
                             session.currentRoundCount(),
                             session.messages(),
                             session.environmentVariables(),
-                            AiSessionStatus.COMPLETED));
+                            AiSessionStatus.COMPLETED,
+                            session.agentTemplateStack()));
 
                     backgroundExecutionContext.markExecutionComplete();
                     return "{\"status\":\"shutdown_initiated\"}";
@@ -290,6 +423,7 @@ public class AiConfig {
 
             @Bean
             @Restricted
+            @ToolCategory("Command Execution")
             public ToolCallback executeTerminalCommand(ExecuteTerminalCommandTool terminalTool) {
             ToolCallback delegate = FunctionToolCallback
                 .builder("executeTerminalCommand", terminalTool::execute)
@@ -306,6 +440,7 @@ public class AiConfig {
 
     @Bean
     @Restricted
+    @ToolCategory("SSH & File Transfer")
     public ToolCallback connectSsh(SshConnectTool sshConnectTool) {
         return FunctionToolCallback
                 .builder("connectSsh", sshConnectTool::execute)
@@ -322,6 +457,7 @@ public class AiConfig {
 
     @Bean
     @Restricted
+    @ToolCategory("SSH & File Transfer")
     public ToolCallback sshDownloadFile(DownloadFileTool downloadFileTool) {
         return FunctionToolCallback
                 .builder("sshDownloadFile", downloadFileTool::execute)
@@ -337,6 +473,7 @@ public class AiConfig {
 
     @Bean
     @Restricted
+    @ToolCategory("SSH & File Transfer")
     public ToolCallback sshUploadFile(UploadFileTool uploadFileTool) {
         return FunctionToolCallback
                 .builder("sshUploadFile", uploadFileTool::execute)
@@ -352,6 +489,7 @@ public class AiConfig {
     }
 
     @Bean
+    @ToolCategory("SSH & File Transfer")
     public ToolCallback listSshConnections(ListSshConnectionsTool listSshConnectionsTool) {
         return FunctionToolCallback
                 .builder("listSshConnections", listSshConnectionsTool::execute)
@@ -365,6 +503,7 @@ public class AiConfig {
     }
 
     @Bean
+    @ToolCategory("SSH & File Transfer")
     public ToolCallback setSshAlias(SetSshAliasTool setSshAliasTool) {
         return FunctionToolCallback
                 .builder("setSshAlias", setSshAliasTool::execute)
@@ -379,6 +518,7 @@ public class AiConfig {
     }
 
     @Bean
+    @ToolCategory("SSH & File Transfer")
     public ToolCallback disconnectSsh(DisconnectSshTool disconnectSshTool) {
         return FunctionToolCallback
                 .builder("disconnectSsh", disconnectSshTool::execute)
@@ -397,6 +537,7 @@ public class AiConfig {
      * job for one-time or recurring execution.
      */
     @Bean
+    @ToolCategory("Scheduling")
     public ToolCallback scheduleBackgroundTask(ObjectProvider<AiSchedulerService> schedulerServiceProvider) {
         return FunctionToolCallback
                 .builder("scheduleBackgroundTask", (ScheduleTaskRequest req) -> {
@@ -463,6 +604,7 @@ public class AiConfig {
      * {@code getURLContents} tool — fetches text content from an HTTP/HTTPS URL.
      */
     @Bean
+    @ToolCategory("Web")
     public ToolCallback getURLContents() {
         return FunctionToolCallback
                 .builder("getURLContents", (GetURLContentsRequest req) -> {
@@ -515,6 +657,7 @@ public class AiConfig {
      * {@code logInfo} tool — writes a message to server logs at INFO level.
      */
     @Bean
+    @ToolCategory("Diagnostics")
     public ToolCallback logInfo() {
         return FunctionToolCallback
                 .builder("logInfo", (LogInfoRequest req) -> {
@@ -548,6 +691,7 @@ public class AiConfig {
      */
     @Bean
     @Restricted
+    @ToolCategory("Schema & Types")
     public ToolCallback compileJavaType(TypeGeneratorService typeGeneratorService) {
         ToolCallback delegate = FunctionToolCallback
                 .builder("compileJavaType", (CompileTypeRequest req) -> {
@@ -593,6 +737,7 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
      * compiled and persisted to MongoDB via {@link #compileJavaType}.
      */
     @Bean
+    @ToolCategory("Schema & Types")
     public ToolCallback listJavaTypes(DatabaseRepository<JavaType> javaTypeRepository) {
         return FunctionToolCallback
                 .builder("listJavaTypes", (ListJavaTypesRequest req) -> {
@@ -626,6 +771,7 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
      * components, so the model knows exactly what fields and types to supply.
      */
     @Bean
+    @ToolCategory("Schema & Types")
     public ToolCallback getTypeSchema() {
         return FunctionToolCallback
                 .builder("getTypeSchema", (GetTypeSchemaRequest req) -> {
@@ -651,6 +797,7 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
      * and persists it via {@link TypeDatabaseService}.
      */
     @Bean
+    @ToolCategory("Schema & Types")
     public ToolCallback saveTypeInstance() {
         return FunctionToolCallback
                 .builder("saveTypeInstance", (SaveTypeInstanceRequest req) -> {
@@ -681,6 +828,7 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
      * as a JSON array.
      */
     @Bean
+    @ToolCategory("Schema & Types")
     public ToolCallback listTypeInstances() {
         return FunctionToolCallback
                 .builder("listTypeInstances", (ListTypeInstancesRequest req) -> {
@@ -713,6 +861,7 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
      * class resolved via {@link JavaTypeClassLoader}.
      */
     @Bean
+    @ToolCategory("Schema & Types")
     public ToolCallback listEnumValues() {
         return FunctionToolCallback
                 .builder("listEnumValues", (ListEnumValuesRequest req) -> {

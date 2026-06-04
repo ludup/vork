@@ -38,7 +38,7 @@ class ExecuteTerminalCommandToolTest {
                 0,
                 List.of(new AiChatMessage("m1", "USER", "hello", System.currentTimeMillis(), null)),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING));
+                AiSessionStatus.RUNNING, null));
 
         RecordingRouter router = new RecordingRouter();
         ExecuteTerminalCommandTool tool = new ExecuteTerminalCommandTool(router, sessionRepo);

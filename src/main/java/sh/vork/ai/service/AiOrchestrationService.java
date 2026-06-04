@@ -3,6 +3,7 @@ package sh.vork.ai.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,10 +11,15 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
+import com.jadaptive.orm.DatabaseRepository;
+
+import sh.vork.ai.agent.AgentTemplate;
 import sh.vork.ai.config.AiConfig;
 import sh.vork.ai.context.ToolExecutionContext;
+import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.memory.SessionEnvironmentService;
 
@@ -48,11 +54,20 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
 
         private final Map<AiProvider, ChatClient> registry;
         private final SessionEnvironmentService sessionEnvironmentService;
+        private final DatabaseRepository<AiSession> sessionRepo;
+        private final DatabaseRepository<AgentTemplate> agentTemplateRepo;
+        private final Map<String, ToolCallback> securedToolCallbackMap;
 
         public AiOrchestrationService(Map<AiProvider, ChatClient> chatClientRegistry,
-                                                                  SessionEnvironmentService sessionEnvironmentService) {
+                                                                  SessionEnvironmentService sessionEnvironmentService,
+                                                                  DatabaseRepository<AiSession> aiSessionRepository,
+                                                                  DatabaseRepository<AgentTemplate> agentTemplateRepository,
+                                                                  Map<String, ToolCallback> securedToolCallbackMap) {
                 this.registry = chatClientRegistry;
                 this.sessionEnvironmentService = sessionEnvironmentService;
+                this.sessionRepo = aiSessionRepository;
+                this.agentTemplateRepo = agentTemplateRepository;
+                this.securedToolCallbackMap = securedToolCallbackMap;
     }
 
     /**
@@ -77,8 +92,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
         log.info("Generating response [provider={}] prompt=\"{}\"...",
                 provider, userPrompt.length() > 120 ? userPrompt.substring(0, 120) + "…" : userPrompt);
 
-        String response = base.mutate()
-                .defaultSystem(composeSystemPrompt())
+        String response = buildMutatedClient(base)
                 .build()
                 .prompt()
                 .user(withBackgroundDirective(userPrompt, provider))
@@ -111,8 +125,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
 
         log.info("Generating chat response [provider={}, history={} msgs]...", provider, conversationHistory.size());
 
-        String response = base.mutate()
-                .defaultSystem(composeSystemPrompt())
+        String response = buildMutatedClient(base)
                 .build()
                 .prompt()
                 .messages(conversationHistory.toArray(Message[]::new))
@@ -158,8 +171,7 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
         effectiveText = withBackgroundDirective(effectiveText, provider);
         allMessages.add(UserMessage.builder().text(effectiveText).media(media).build());
 
-        String response = base.mutate()
-                .defaultSystem(composeSystemPrompt())
+        String response = buildMutatedClient(base)
                 .build()
                 .prompt()
                 .messages(allMessages.toArray(Message[]::new))
@@ -182,18 +194,89 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
 
         private String composeSystemPrompt() {
                 String sessionUuid = ToolExecutionContext.getSessionUuid();
+                StringBuilder prompt = new StringBuilder(AiConfig.BASE_SYSTEM_PROMPT);
+
                 if (sessionUuid == null || sessionUuid.isBlank()) {
-                        return AiConfig.BASE_SYSTEM_PROMPT;
+                        return prompt.toString();
                 }
 
+                // Inject active agent template directives
+                AiSession session = sessionRepo.get(sessionUuid);
+                if (session != null) {
+                        String agentId = session.getActiveAgentTemplateId();
+                        if (agentId != null) {
+                                AgentTemplate template = agentTemplateRepo.get(agentId);
+                                if (template != null && !template.systemPrompt().isBlank()) {
+                                        prompt.append("\n\n### ACTIVE AGENT DIRECTIVES\n").append(template.systemPrompt());
+                                }
+                        }
+                }
+
+                // Inject session environment variables
                 Map<String, String> envMap = sessionEnvironmentService.getEnv(sessionUuid);
-                if (envMap == null || envMap.isEmpty()) {
-                        return AiConfig.BASE_SYSTEM_PROMPT;
+                if (envMap != null && !envMap.isEmpty()) {
+                        StringBuilder envBlock = new StringBuilder("\n### ACTIVE SESSION ENVIRONMENT VARIABLES\n");
+                        envMap.forEach((k, v) -> envBlock.append(k).append("=").append(v).append("\n"));
+                        prompt.append(envBlock);
                 }
 
-                StringBuilder envBlock = new StringBuilder("\n### ACTIVE SESSION ENVIRONMENT VARIABLES\n");
-                envMap.forEach((k, v) -> envBlock.append(k).append("=").append(v).append("\n"));
-                return AiConfig.BASE_SYSTEM_PROMPT + envBlock;
+                return prompt.toString();
+        }
+
+        /**
+         * Builds a mutated {@link ChatClient.Builder} from the shared base client with the
+         * composed system prompt and, when an active {@link AgentTemplate} restricts the
+         * allowed tools, the filtered tool set applied.
+         */
+        private ChatClient.Builder buildMutatedClient(ChatClient base) {
+                // Resolve which tools to expose for this request: filtered subset when an
+                // AgentTemplate is active, or the full secured set otherwise.
+                // Tools are always set here (never on the base ChatClient) to prevent
+                // Spring AI from seeing duplicates when the builder is mutated.
+                ToolCallback[] filtered = resolveFilteredToolCallbacks();
+                ToolCallback[] tools = (filtered != null)
+                        ? filtered
+                        : securedToolCallbackMap.values().toArray(ToolCallback[]::new);
+
+                return base.mutate()
+                        .defaultSystem(composeSystemPrompt())
+                        .defaultToolCallbacks(tools);
+        }
+
+        /**
+         * Returns a filtered array of tool callbacks for the active agent template, or
+         * {@code null} if no filtering is needed (i.e., the default tool set should be used).
+         */
+        private ToolCallback[] resolveFilteredToolCallbacks() {
+                String sessionUuid = ToolExecutionContext.getSessionUuid();
+                if (sessionUuid == null || sessionUuid.isBlank()) {
+                        return null;
+                }
+
+                AiSession session = sessionRepo.get(sessionUuid);
+                if (session == null) {
+                        return null;
+                }
+
+                String agentId = session.getActiveAgentTemplateId();
+                if (agentId == null) {
+                        return null;
+                }
+
+                AgentTemplate template = agentTemplateRepo.get(agentId);
+                if (template == null || template.allowedTools() == null || template.allowedTools().isEmpty()) {
+                        return null;
+                }
+
+                ToolCallback[] result = template.allowedTools().stream()
+                        .map(securedToolCallbackMap::get)
+                        .filter(Objects::nonNull)
+                        .toArray(ToolCallback[]::new);
+
+                log.debug("Tool filtering active [agent={}, allowedTools={}, resolved={}]",
+                        agentId, template.allowedTools().size(), result.length);
+
+                return result.length > 0 ? result : null;
         }
 
 }
