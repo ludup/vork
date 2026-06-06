@@ -27,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @param status    lifecycle state enum for autonomous/background execution tracking
  * @param activeAgentTemplateId UUID of the currently active {@link sh.vork.ai.agent.AgentTemplate},
  *                              or {@code null} to use the default Concierge persona
+ * @param modelId               the AI model ID in use (e.g. {@code "gemini-2.5-flash"}),
+ *                              or {@code null} to use the provider default
  */
 public record AiSession(
         String              uuid,
@@ -39,7 +41,8 @@ public record AiSession(
         List<AiChatMessage> messages,
         Map<String, String> environmentVariables,
     AiSessionStatus     status,
-    String              activeAgentTemplateId
+    String              activeAgentTemplateId,
+    String              modelId
 ) implements DatabaseEntity {
 
     public AiSession {

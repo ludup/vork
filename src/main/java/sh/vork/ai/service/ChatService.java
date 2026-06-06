@@ -102,7 +102,7 @@ public class ChatService {
      * Returns the existing {@link AiSession} for the given HTTP session ID,
      * or creates a new one bound to {@code provider}.
      */
-    public AiSession getOrCreateSession(String httpSessionId, AiProvider provider) {
+    public AiSession getOrCreateSession(String httpSessionId, AiProvider provider, String modelId) {
         if (httpSessionId == null || httpSessionId.isBlank()) {
             throw new IllegalArgumentException("httpSessionId is required");
         }
@@ -122,23 +122,31 @@ public class ChatService {
         AiSession session = new AiSession(httpSessionId, provider.name(), SessionOriginMode.WEB,
             username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(),
             AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING,
-            AgentTemplateSeeder.UUID_CONCIERGE);
+            AgentTemplateSeeder.UUID_CONCIERGE, modelId);
         sessionRepo.save(session);
-        log.info("Created HTTP session-bound AI session [id={}, provider={}, user={}]",
-            httpSessionId, provider, username);
+        log.info("Created HTTP session-bound AI session [id={}, provider={}, model={}, user={}]",
+            httpSessionId, provider, modelId, username);
         return session;
     }
 
-    public AiSession createNewSession(AiProvider provider) {
+    public AiSession getOrCreateSession(String httpSessionId, AiProvider provider) {
+        return getOrCreateSession(httpSessionId, provider, null);
+    }
+
+    public AiSession createNewSession(AiProvider provider, String modelId) {
         String username = resolveUsername();
         String uuid = UUID.randomUUID().toString();
         AiSession session = new AiSession(uuid, provider.name(), SessionOriginMode.WEB,
             username, DEFAULT_SESSION_NAME, System.currentTimeMillis(), 0, List.of(),
             AiSession.defaultEnvironmentVariables(), AiSessionStatus.RUNNING,
-            AgentTemplateSeeder.UUID_CONCIERGE);
+            AgentTemplateSeeder.UUID_CONCIERGE, modelId);
         sessionRepo.save(session);
-        log.info("Created AI session [id={}, provider={}, user={}]", uuid, provider, username);
+        log.info("Created AI session [id={}, provider={}, model={}, user={}]", uuid, provider, modelId, username);
         return session;
+    }
+
+    public AiSession createNewSession(AiProvider provider) {
+        return createNewSession(provider, null);
     }
 
     public AiSession getSessionForCurrentUser(String sessionUuid) {
@@ -183,7 +191,8 @@ public class ChatService {
                 session.messages(),
             AiSession.defaultEnvironmentVariables(),
                 session.status(),
-                session.activeAgentTemplateId());
+                session.activeAgentTemplateId(),
+                session.modelId());
         sessionRepo.save(renamed);
         return renamed;
     }
@@ -335,7 +344,8 @@ public class ChatService {
                 if (frozenSession == null) { frozenSession = session; }
                 sessionRepo.save(new AiSession(frozenSession.uuid(), frozenSession.provider(), frozenSession.originMode(), frozenSession.username(),
                     frozenSession.name(), frozenSession.createdAt(), frozenSession.currentRoundCount(), List.copyOf(updated),
-                    frozenSession.environmentVariables(), AiSessionStatus.AWAITING_INPUT, frozenSession.activeAgentTemplateId()));
+                    frozenSession.environmentVariables(), AiSessionStatus.AWAITING_INPUT, frozenSession.activeAgentTemplateId(),
+                    frozenSession.modelId()));
 
                 if (provider == AiProvider.BACKGROUND_SCHEDULER) {
                 systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
@@ -502,7 +512,8 @@ public class ChatService {
                         List.copyOf(updated),
                         frozenSession.environmentVariables(),
                         AiSessionStatus.AWAITING_INPUT,
-                        frozenSession.activeAgentTemplateId()));
+                        frozenSession.activeAgentTemplateId(),
+                        frozenSession.modelId()));
 
                 if (provider == AiProvider.BACKGROUND_SCHEDULER) {
                     systemNotificationService.notifyOfflineOperator(ex.getToolName(), ex.getArguments(), sessionUuid, eventId);
@@ -583,7 +594,8 @@ public class ChatService {
                     }
                     sessionRepo.save(new AiSession(current.uuid(), current.provider(), current.originMode(),
                             current.username(), current.name(), current.createdAt(), current.currentRoundCount(),
-                            current.messages(), current.environmentVariables(), current.status(), targetId));
+                            current.messages(), current.environmentVariables(), current.status(), targetId,
+                            current.modelId()));
                     log.info("Agent switched [session={}, target={}, newAgent={}]",
                             sessionUuid, structured.targetAgent(), targetId);
 
@@ -614,7 +626,8 @@ public class ChatService {
                     }
                     sessionRepo.save(new AiSession(current.uuid(), current.provider(), current.originMode(),
                             current.username(), current.name(), current.createdAt(), current.currentRoundCount(),
-                            current.messages(), current.environmentVariables(), current.status(), targetId));
+                            current.messages(), current.environmentVariables(), current.status(), targetId,
+                            current.modelId()));
                     String agentDisplayName = resolveAgentNameById(targetId);
                     broadcastAndAccumulateTransition(sessionUuid,
                             "Changed to " + agentDisplayName, transitionMsgs);
@@ -655,7 +668,7 @@ public class ChatService {
                     latest.username(), latest.name(), latest.createdAt(),
                     latest.currentRoundCount(), List.copyOf(updated),
                     latest.environmentVariables(), persistedStatus,
-                    latest.activeAgentTemplateId()));
+                    latest.activeAgentTemplateId(), latest.modelId()));
 
             maybeGenerateSessionName(sessionUuid);
             log.info("Agent loop completed [session={}, iterations={}]", sessionUuid, i + 1);
@@ -680,7 +693,7 @@ public class ChatService {
                 latest.username(), latest.name(), latest.createdAt(),
                 latest.currentRoundCount(), List.copyOf(updated),
                 latest.environmentVariables(), AiSessionStatus.RUNNING,
-                latest.activeAgentTemplateId()));
+                latest.activeAgentTemplateId(), latest.modelId()));
         return aiMsg;
     }
 
@@ -718,6 +731,23 @@ public class ChatService {
     }
 
     /**
+     * Updates the provider and model stored in a session.
+     * Validates that the session belongs to the current user.
+     */
+    public AiSession updateSessionModel(String sessionUuid, String provider, String modelId) {
+        AiSession session = getSessionForCurrentUser(sessionUuid);
+        AiSession updated = new AiSession(
+                session.uuid(), provider != null ? provider : session.provider(),
+                session.originMode(), session.username(), session.name(),
+                session.createdAt(), session.currentRoundCount(), session.messages(),
+                session.environmentVariables(), session.status(),
+                session.activeAgentTemplateId(), modelId);
+        sessionRepo.save(updated);
+        log.info("Session model updated [session={}, provider={}, model={}]", sessionUuid, provider, modelId);
+        return updated;
+    }
+
+    /**
      * Returns all configured {@link sh.vork.ai.agent.AgentTemplate} records.
      */
     public List<AgentTemplate> listAgentTemplates() {
@@ -734,7 +764,8 @@ public class ChatService {
         }
         sessionRepo.save(new AiSession(session.uuid(), session.provider(), session.originMode(),
                 session.username(), session.name(), session.createdAt(), session.currentRoundCount(),
-                session.messages(), session.environmentVariables(), session.status(), agentTemplateId));
+                session.messages(), session.environmentVariables(), session.status(), agentTemplateId,
+                session.modelId()));
         UiEventFrame switchEvent = new UiEventFrame(UUID.randomUUID().toString(),
                 "AGENT_SWITCH", "AGENT_SWITCH", agentTemplateId, null);
         messaging.convertAndSend("/topic/chat/" + sessionUuid, switchEvent);
@@ -891,7 +922,8 @@ public class ChatService {
                 List.copyOf(updated),
                 session.environmentVariables(),
                 persistedStatus,
-                session.activeAgentTemplateId()));
+                session.activeAgentTemplateId(),
+                session.modelId()));
 
         maybeGenerateSessionName(session.uuid());
     }
@@ -1022,7 +1054,8 @@ public class ChatService {
                     latest.messages(),
                     latest.environmentVariables(),
                     latest.status(),
-                    latest.activeAgentTemplateId()));
+                    latest.activeAgentTemplateId(),
+                    latest.modelId()));
             log.info("Session title generated [session={}, title={}]", sessionUuid, sanitized);
         } catch (Exception ex) {
             log.warn("Failed to auto-name session [session={}]: {}", sessionUuid, ex.getMessage());

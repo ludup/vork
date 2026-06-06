@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" width="900" height="340" font-family="'Courier New', monospace">
+  <!-- Background -->
+  <rect width="900" height="340" fill="#0a0a0f"/>
+
+  <!-- Grid lines -->
+  <g stroke="#1a1a2e" stroke-width="1" opacity="0.6">
+    <line x1="0" y1="40" x2="900" y2="40"/>
+    <line x1="0" y1="80" x2="900" y2="80"/>
+    <line x1="0" y1="120" x2="900" y2="120"/>
+    <line x1="0" y1="160" x2="900" y2="160"/>
+    <line x1="0" y1="200" x2="900" y2="200"/>
+    <line x1="0" y1="240" x2="900" y2="240"/>
+    <line x1="0" y1="280" x2="900" y2="280"/>
+    <line x1="0" y1="320" x2="900" y2="320"/>
+    <line x1="60" y1="0" x2="60" y2="340"/>
+    <line x1="120" y1="0" x2="120" y2="340"/>
+    <line x1="180" y1="0" x2="180" y2="340"/>
+    <line x1="240" y1="0" x2="240" y2="340"/>
+    <line x1="300" y1="0" x2="300" y2="340"/>
+    <line x1="360" y1="0" x2="360" y2="340"/>
+    <line x1="420" y1="0" x2="420" y2="340"/>
+    <line x1="480" y1="0" x2="480" y2="340"/>
+    <line x1="540" y1="0" x2="540" y2="340"/>
+    <line x1="600" y1="0" x2="600" y2="340"/>
+    <line x1="660" y1="0" x2="660" y2="340"/>
+    <line x1="720" y1="0" x2="720" y2="340"/>
+    <line x1="780" y1="0" x2="780" y2="340"/>
+    <line x1="840" y1="0" x2="840" y2="340"/>
+  </g>
+
+  <!-- Scan line overlay -->
+  <rect width="900" height="340" fill="url(#scanlines)" opacity="0.15"/>
+  <defs>
+    <pattern id="scanlines" x="0" y="0" width="900" height="4" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="900" height="2" fill="transparent"/>
+      <rect x="0" y="2" width="900" height="2" fill="#000" opacity="0.4"/>
+    </pattern>
+  </defs>
+
+  <!-- Left panel: Agent selector -->
+  <rect x="30" y="40" width="200" height="260" rx="8" fill="#111122" stroke="#334" stroke-width="1.5"/>
+  <text x="130" y="68" fill="#4af" font-size="11" text-anchor="middle" letter-spacing="3">AGENT SELECT</text>
+  <line x1="50" y1="75" x2="210" y2="75" stroke="#334" stroke-width="1"/>
+
+  <!-- Concierge button - dimmed (inactive) -->
+  <rect x="55" y="92" width="150" height="52" rx="6" fill="#0d1a2e" stroke="#2255aa" stroke-width="1.5"/>
+  <text x="130" y="112" fill="#2255aa" font-size="10" text-anchor="middle" letter-spacing="2">CONCIERGE</text>
+  <text x="130" y="128" fill="#2255aa" font-size="8" text-anchor="middle" opacity="0.6">general purpose</text>
+  <circle cx="72" cy="118" r="5" fill="#113" stroke="#2255aa" stroke-width="1"/>
+
+  <!-- Arrow down between agents -->
+  <text x="130" y="168" fill="#4af" font-size="20" text-anchor="middle">⇅</text>
+  <text x="130" y="183" fill="#446" font-size="8" text-anchor="middle" letter-spacing="1">SWITCH_AGENT</text>
+
+  <!-- Computer Admin button - active (glowing) -->
+  <rect x="55" y="192" width="150" height="52" rx="6" fill="#0a2a0a" stroke="#44ff88" stroke-width="2">
+    <animate attributeName="opacity" values="1;0.85;1" dur="2.5s" repeatCount="indefinite"/>
+  </rect>
+  <text x="130" y="212" fill="#44ff88" font-size="10" text-anchor="middle" letter-spacing="2">COMPUTER ADMIN</text>
+  <text x="130" y="228" fill="#44ff88" font-size="8" text-anchor="middle" opacity="0.7">ssh &amp; terminal</text>
+  <circle cx="72" cy="218" r="5" fill="#44ff88">
+    <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Status indicator -->
+  <rect x="55" y="262" width="150" height="24" rx="4" fill="#111" stroke="#335" stroke-width="1"/>
+  <text x="130" y="278" fill="#4af" font-size="9" text-anchor="middle" letter-spacing="2">● ACTIVE</text>
+
+  <!-- Centre: Terminal output pane -->
+  <rect x="260" y="40" width="380" height="260" rx="6" fill="#050510" stroke="#334" stroke-width="1.5"/>
+  <rect x="260" y="40" width="380" height="28" rx="6" fill="#0d0d1e" stroke="#334" stroke-width="0"/>
+  <rect x="261" y="61" width="378" height="7" fill="#050510"/>
+  <text x="450" y="59" fill="#668" font-size="10" text-anchor="middle" letter-spacing="2">TERMINAL OUTPUT</text>
+
+  <!-- Terminal content -->
+  <text x="278" y="90" fill="#4af" font-size="10">$</text>
+  <text x="292" y="90" fill="#8cf" font-size="10">sleep 400</text>
+  <text x="278" y="108" fill="#888" font-size="9">Streaming output...</text>
+  <text x="278" y="124" fill="#666" font-size="9">................................</text>
+  <text x="278" y="140" fill="#666" font-size="9">................................</text>
+
+  <!-- Abort signal line -->
+  <line x1="278" y1="160" x2="620" y2="160" stroke="#ef4444" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>
+  <text x="278" y="175" fill="#ef4444" font-size="9">^C  [SIGINT sent — aborting process]</text>
+  <text x="278" y="191" fill="#f87" font-size="9">AbortedTerminalCommandException caught</text>
+  <text x="278" y="207" fill="#4af" font-size="10">→</text>
+  <text x="292" y="207" fill="#6f6" font-size="9">{"status":"aborted","message":"..."}</text>
+  <text x="278" y="225" fill="#668" font-size="9" letter-spacing="1">session invalidated · fresh shell ready</text>
+
+  <line x1="278" y1="238" x2="620" y2="238" stroke="#334" stroke-width="1"/>
+  <text x="278" y="255" fill="#4af" font-size="10">$</text>
+  <text x="292" y="255" fill="#8cf" font-size="10"><tspan fill="#8cf">_</tspan><animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/></text>
+  <text x="292" y="255" fill="#8cf" font-size="10">█</text>
+
+  <!-- Right panel: ABORT button -->
+  <rect x="670" y="40" width="200" height="260" rx="8" fill="#111122" stroke="#334" stroke-width="1.5"/>
+  <text x="770" y="68" fill="#ef4444" font-size="11" text-anchor="middle" letter-spacing="3">ABORT</text>
+  <line x1="690" y1="75" x2="850" y2="75" stroke="#334" stroke-width="1"/>
+
+  <!-- Big red stop button -->
+  <circle cx="770" cy="155" r="58" fill="#1a0505" stroke="#ef4444" stroke-width="3">
+    <animate attributeName="stroke-opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="770" cy="155" r="46" fill="#3a0808">
+    <animate attributeName="fill" values="#3a0808;#5a1010;#3a0808" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <!-- Stop icon square -->
+  <rect x="750" y="135" width="40" height="40" rx="6" fill="#ef4444">
+    <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+  </rect>
+
+  <text x="770" y="232" fill="#ef4444" font-size="9" text-anchor="middle" letter-spacing="2">POST /terminate</text>
+
+  <!-- Safety label -->
+  <rect x="695" y="252" width="150" height="32" rx="4" fill="#1a0a00" stroke="#885500" stroke-width="1"/>
+  <text x="770" y="265" fill="#fa8" font-size="8" text-anchor="middle" letter-spacing="1">⚠ COMMAND CONTROL</text>
+  <text x="770" y="278" fill="#fa8" font-size="8" text-anchor="middle" opacity="0.7">session-safe abort</text>
+
+  <!-- Bottom bar -->
+  <rect x="0" y="310" width="900" height="30" fill="#0d0d1e" opacity="0.9"/>
+  <text x="30" y="329" fill="#4af" font-size="10" letter-spacing="3">VORK MAINFRAME</text>
+  <text x="450" y="329" fill="#446" font-size="10" text-anchor="middle" letter-spacing="2">JOURNAL 003 — COMMAND &amp; CONTROL</text>
+  <text x="870" y="329" fill="#446" font-size="10" text-anchor="end" letter-spacing="1">2026.06.05</text>
+
+  <!-- Corner accents -->
+  <polyline points="0,0 25,0 25,5" fill="none" stroke="#4af" stroke-width="2"/>
+  <polyline points="875,0 900,0 900,25" fill="none" stroke="#4af" stroke-width="2"/>
+  <polyline points="0,340 0,315 5,315" fill="none" stroke="#ef4444" stroke-width="2"/>
+  <polyline points="895,315 900,315 900,340" fill="none" stroke="#ef4444" stroke-width="2"/>
+</svg>

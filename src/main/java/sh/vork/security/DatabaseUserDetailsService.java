@@ -11,8 +11,9 @@ import com.jadaptive.orm.DatabaseRepository;
 
 /**
  * Database-backed UserDetailsService.
- * Loads user credentials from MongoDB VorkUser collection.
- * On first run (empty DB), seeds with default admin/user accounts.
+ * Loads user credentials from the MongoDB VorkUser collection.
+ *
+ * <p>Account creation is handled by the first-run setup wizard ({@code SetupController}).
  */
 @Service
 public class DatabaseUserDetailsService implements UserDetailsService {
@@ -24,7 +25,6 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                                      PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        seedDefaultUsersIfEmpty();
     }
 
     @Override
@@ -38,44 +38,6 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                 .password(vorkUser.passwordHash())
                 .roles(vorkUser.role().replace("ROLE_", ""))
                 .build();
-    }
-
-    /**
-     * Seeds the database with default admin and user accounts if empty.
-     * Returns true if seeding occurred.
-     */
-    private boolean seedDefaultUsersIfEmpty() {
-        try {
-            long count = userRepository.count();
-            if (count > 0) {
-                return false;
-            }
-
-            // Create default admin user
-            VorkUser admin = new VorkUser(
-                "admin",
-                passwordEncoder.encode("admin123"),
-                "ADMIN",
-                System.currentTimeMillis(),
-                System.currentTimeMillis()
-            );
-            userRepository.save(admin);
-
-            // Create default user
-            VorkUser user = new VorkUser(
-                "user",
-                passwordEncoder.encode("user123"),
-                "USER",
-                System.currentTimeMillis(),
-                System.currentTimeMillis()
-            );
-            userRepository.save(user);
-
-            return true;
-        } catch (Exception e) {
-            // If seeding fails, continue (in-memory config will be used)
-            return false;
-        }
     }
 
     /**

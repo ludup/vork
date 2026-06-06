@@ -232,7 +232,8 @@ public class ChatAuthorizationController {
                     List.copyOf(suspendedMessages),
                     session.environmentVariables(),
                     AiSessionStatus.AWAITING_INPUT,
-                    session.activeAgentTemplateId()));
+                    session.activeAgentTemplateId(),
+                    session.modelId()));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
                 log.info("Tool execution suspended for additional input [tool={}, session={}]",
@@ -335,7 +336,8 @@ public class ChatAuthorizationController {
                         List.copyOf(updated),
                         session.environmentVariables(),
                         AiSessionStatus.RUNNING,
-                        session.activeAgentTemplateId()));
+                        session.activeAgentTemplateId(),
+                        session.modelId()));
             }
 
             if (originMode == SessionOriginMode.BACKGROUND) {
@@ -350,7 +352,8 @@ public class ChatAuthorizationController {
                         List.copyOf(updated),
                     session.environmentVariables(),
                     AiSessionStatus.RUNNING,
-                    session.activeAgentTemplateId()));
+                    session.activeAgentTemplateId(),
+                    session.modelId()));
 
                 aiBackgroundExecutor.execute(() -> {
                     ToolExecutionContext.bindSessionUuid(sessionUuid);
@@ -495,7 +498,8 @@ public class ChatAuthorizationController {
                     List.copyOf(updated),
                     session.environmentVariables(),
                     AiSessionStatus.AWAITING_INPUT,
-                    session.activeAgentTemplateId()));
+                    session.activeAgentTemplateId(),
+                    session.modelId()));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, suspendedPromptEvent);
                 log.info("Resumed call suspended again [tool={}, session={}]", ex.getToolName(), sessionUuid);
@@ -539,7 +543,8 @@ public class ChatAuthorizationController {
                     List.copyOf(updated),
                     session.environmentVariables(),
                     AiSessionStatus.RUNNING,
-                    session.activeAgentTemplateId()));
+                    session.activeAgentTemplateId(),
+                    session.modelId()));
 
                 messaging.convertAndSend("/topic/chat/" + sessionUuid, errorEvent);
                 ToolExecutionContext.clear();
@@ -581,7 +586,8 @@ public class ChatAuthorizationController {
                     List.copyOf(updated),
                     session.environmentVariables(),
                     AiSessionStatus.RUNNING,
-                    session.activeAgentTemplateId()));
+                    session.activeAgentTemplateId(),
+                    session.modelId()));
 
             if (chatService != null) {
                 chatService.maybeGenerateSessionName(session.uuid());
@@ -847,6 +853,7 @@ public class ChatAuthorizationController {
         // outputFileUuid, etc. We just need to add command and normalise the outputs.
         Map<String, Object> payload = new HashMap<>();
         String outputFileUuid = null;
+        boolean plainStringResult = false;
         try {
             Map<String, Object> toolResultObj = objectMapper.readValue(toolResult, new TypeReference<Map<String, Object>>() {});
             payload.putAll(toolResultObj);
@@ -855,14 +862,24 @@ public class ChatAuthorizationController {
                 outputFileUuid = String.valueOf(fileUuid);
             }
         } catch (Exception ignored) {
+            // Tool returned a plain string — treat it as raw terminal output.
             payload.put("status", "COMPLETED");
+            plainStringResult = true;
         }
 
         String command = extractTerminalCommand(argumentsJson);
         payload.put("command", command);
 
-        // Only compute output fields when the response carries terminal output.
-        if (!payload.containsKey("rawOutput") && !payload.containsKey("displayOutput")) {
+        if (plainStringResult) {
+            // Tool returned a non-object result (plain string, number, etc.).
+            // Spring AI JSON-encodes the return value, so we must unwrap it.
+            String rawOutput = unwrapTerminalToolResult(toolResult);
+            if (rawOutput == null) rawOutput = "";
+            String displayOutput = normalizeTerminalTranscript(command, rawOutput);
+            payload.put("rawOutput", compactTerminalHistoryOutput(rawOutput, null));
+            payload.put("displayOutput", compactTerminalHistoryOutput(displayOutput, null));
+        } else if (!payload.containsKey("rawOutput") && !payload.containsKey("displayOutput")) {
+            // JSON result with no output fields (e.g. aborted/error status).
             payload.put("rawOutput", "");
             payload.put("displayOutput", "");
         } else {

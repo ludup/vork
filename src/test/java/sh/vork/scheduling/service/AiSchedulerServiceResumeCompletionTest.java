@@ -12,7 +12,7 @@ import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
 import com.jadaptive.orm.mock.MapDatabaseRepository;
-import sh.vork.scheduling.domain.DurationType;
+import sh.vork.scheduling.domain.InvocationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;
 
@@ -32,10 +32,14 @@ class AiSchedulerServiceResumeCompletionTest {
                 "prompt",
                 "source",
                 "alice",
+                InvocationType.ONE_TIME,
                 Instant.parse("2026-05-17T18:00:00Z"),
                 0,
-                DurationType.MINUTES,
-                ScheduledJobStatus.PAUSED));
+                null,
+                0L,
+                0L,
+                null, null, null,
+                ScheduledJobStatus.AWAITING_INPUT));
 
         sessionRepo.save(new AiSession(
                 trackingSessionUuid,
@@ -47,7 +51,7 @@ class AiSchedulerServiceResumeCompletionTest {
                 1,
                 List.of(new AiChatMessage("m1", "USER", "prompt", System.currentTimeMillis(), null)),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING, null));
+                AiSessionStatus.RUNNING, null, null));
 
         CompletingEngine engine = new CompletingEngine(sessionRepo);
         AiSchedulerService service = new AiSchedulerService(null, jobRepo, engine, sessionRepo);
@@ -55,7 +59,7 @@ class AiSchedulerServiceResumeCompletionTest {
         service.resumeBackgroundSession(trackingSessionUuid);
 
         ScheduledJob updated = jobRepo.get(jobId);
-        assertEquals(ScheduledJobStatus.COMPLETED, updated.status());
+        assertEquals(ScheduledJobStatus.WAITING, updated.status());
     }
 
     private static final class CompletingEngine extends BackgroundOrchestrationEngine {
@@ -82,7 +86,7 @@ class AiSchedulerServiceResumeCompletionTest {
                     s.currentRoundCount(),
                     s.messages(),
                     AiSession.defaultEnvironmentVariables(),
-                    AiSessionStatus.COMPLETED, null));
+                    AiSessionStatus.COMPLETED, null, null));
         }
     }
 }

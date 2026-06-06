@@ -65,12 +65,14 @@ public class ToolRegistry {
                         getToolCategory(beanName),
                         def.description(),
                         def.inputSchema(),
-                        isRestrictedTool(beanName)));
+                        isRestrictedTool(beanName),
+                        isHiddenTool(beanName)));
             } catch (Exception ex) {
                 log.warn("Failed to index tool callback [bean={}]: {}", beanName, ex.getMessage());
             }
         });
-        log.info("ToolRegistry: indexed {} tool callbacks", descriptors.size());
+        long hiddenCount = descriptors.values().stream().filter(ToolDescriptor::hidden).count();
+        log.info("ToolRegistry: indexed {} tool callbacks ({} hidden)", descriptors.size(), hiddenCount);
     }
 
     /**
@@ -79,6 +81,14 @@ public class ToolRegistry {
      */
     private boolean isRestrictedTool(String toolName) {
         return readMethodAnnotation(toolName, Restricted.class) != null;
+    }
+
+    /**
+     * Returns {@code true} when the {@code @Bean} factory method for the given
+     * bean name is annotated with {@link Hidden}.
+     */
+    private boolean isHiddenTool(String toolName) {
+        return readMethodAnnotation(toolName, Hidden.class) != null;
     }
 
     /**
@@ -140,10 +150,17 @@ public class ToolRegistry {
     }
 
     /**
-     * Returns all indexed tool descriptors, one per registered {@code ToolCallback} bean.
+     * Returns all publicly visible tool descriptors — hidden tools are excluded.
+     *
+     * <p>This is the view served to operators via the management API and to AI agents
+     * via the {@code listAvailableTools} tool.  Hidden tools (annotated with
+     * {@link Hidden}) are infrastructure tools that are injected per-session and
+     * must not appear in agent configuration UIs.
      */
     public Collection<ToolDescriptor> getAvailableTools() {
-        return descriptors.values();
+        return descriptors.values().stream()
+                .filter(d -> !d.hidden())
+                .toList();
     }
 
     /**

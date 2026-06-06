@@ -64,7 +64,8 @@ and a retry with different instructions would help.
             List.of(
                     "listAgentTemplates",
                     "listAvailableTools"
-            )
+            ),
+            true
     );
 
     private static final String COMPUTER_ADMIN_PROMPT = """
@@ -132,7 +133,8 @@ and a retry with different instructions would help.
                     "listSshConnections",
                     "setSshAlias",
                     "disconnectSsh"
-            )
+            ),
+            true
     );
 
     // -------------------------------------------------------------------------

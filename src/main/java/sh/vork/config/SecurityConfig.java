@@ -28,6 +28,7 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/login/**").permitAll()
+                .requestMatchers("/setup", "/api/setup/**").permitAll()
                 .requestMatchers("/api/authorization/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/*.ico").permitAll()
                 .requestMatchers("/ws/**").permitAll()
@@ -56,7 +57,9 @@ public class SecurityConfig {
                 .key("vork-remember-me-key-change-in-production")
             )
             .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/api/authorization/**", "/api/chat/**", "/ws/**", "/logout")
+                .ignoringRequestMatchers("/api/authorization/**", "/api/chat/**", "/ws/**", "/logout",
+                        "/api/setup/**", "/api/system/**", "/api/ai/**", "/api/agents/**",
+                        "/api/notifications/**", "/api/user/**")
             )
             .sessionManagement(session -> session
                 .sessionConcurrency(concurrency -> concurrency

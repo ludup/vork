@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Models — Vork</title>
+    <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body>
+<div class="container py-5" style="max-width: 700px;">
+    <div th:replace="~{fragments/settings-navigation :: backToSettings}"></div>
+    <h2 class="mb-1"><i class="fa-solid fa-robot me-2"></i>AI Models</h2>
+    <p class="text-muted mb-4">Configure AI providers. The selected provider and model are stored per session.</p>
+
+    <div id="alert-area"></div>
+
+    <!-- Global Default card -->
+    <div class="card mb-4 border-primary">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-star text-primary"></i>
+            <span class="fw-semibold">Global Default</span>
+            <span class="text-muted small ms-1">— used for all new sessions unless overridden</span>
+        </div>
+        <div class="card-body">
+            <th:block th:with="hasAny=${#lists.isEmpty(providers) == false and providers.?[configured == true and not #lists.isEmpty(models)].size() > 0}">
+                <div th:if="${hasAny}">
+                    <label class="form-label" for="global-default-select">Provider &amp; Model</label>
+                    <select id="global-default-select" class="form-select mb-3">
+                        <option value="">— none selected —</option>
+                        <th:block th:each="group : ${providers}" th:if="${group.configured() and not #lists.isEmpty(group.models())}">
+                            <optgroup th:label="${group.providerLabel()}">
+                                <option th:each="m : ${group.models()}"
+                                        th:value="${group.providerKey() + ':' + m.modelId()}"
+                                        th:text="${group.providerLabel() + ' — ' + m.label()}"
+                                        th:selected="${group.providerKey() + ':' + m.modelId() == globalDefaultKey}">
+                                </option>
+                            </optgroup>
+                        </th:block>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="saveGlobalDefault()">
+                        <i class="fa-solid fa-save me-1"></i>Save Global Default
+                    </button>
+                </div>
+                <div th:unless="${hasAny}" class="text-muted small">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    Configure at least one AI provider above to set a global default.
+                </div>
+            </th:block>
+        </div>
+    </div>
+
+    <!-- Provider cards rendered from server-side model -->
+    <div th:each="group : ${providers}" class="card mb-3" th:id="'card-' + ${group.providerKey()}">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-semibold" th:text="${group.providerLabel()}"></span>
+                <span th:if="${group.configured()}" class="badge bg-success">Configured</span>
+                <span th:unless="${group.configured()}" class="badge bg-secondary">Not configured</span>
+                <span th:if="${group.providerKey() == 'GEMINI'}" class="badge bg-info text-dark">Built-in</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary"
+                    th:attr="data-provider=${group.providerKey()}"
+                    onclick="toggleForm(this.dataset.provider)"
+                    th:disabled="${group.providerKey() == 'BACKGROUND_SCHEDULER'}">
+                <i class="fa-solid fa-gear me-1"></i>Configure
+            </button>
+        </div>
+
+        <div th:id="'form-' + ${group.providerKey()}" class="card-body" style="display:none;">
+            <form th:attr="data-provider=${group.providerKey()}"
+                  onsubmit="saveConfig(event, this.dataset.provider); return false;">
+
+                <!-- API Key (not for Ollama) -->
+                <div class="mb-3" th:unless="${group.providerKey() == 'OLLAMA'}">
+                    <label class="form-label">API Key</label>
+                    <input type="password"
+                           class="form-control"
+                           th:id="'apiKey-' + ${group.providerKey()}"
+                           th:name="'apiKey-' + ${group.providerKey()}"
+                           placeholder="Leave blank to keep existing key"
+                           autocomplete="off">
+                    <div class="form-text" th:if="${group.configured()}">A key is already stored. Enter a new one to replace it.</div>
+                </div>
+
+                <!-- Base URL (Ollama only) -->
+                <div class="mb-3" th:if="${group.providerKey() == 'OLLAMA'}">
+                    <label class="form-label">Ollama Base URL</label>
+                    <input type="url"
+                           class="form-control"
+                           th:id="'baseUrl-' + ${group.providerKey()}"
+                           th:name="'baseUrl-' + ${group.providerKey()}"
+                           th:placeholder="'http://localhost:11434'"
+                           autocomplete="off">
+                </div>
+
+                <!-- Default model — only shown when provider is configured and models were discovered -->
+                <div class="mb-3" th:if="${group.configured() and not #lists.isEmpty(group.models())}">
+                    <label class="form-label">Default Model</label>
+                    <select class="form-select" th:id="'model-' + ${group.providerKey()}">
+                        <option value="">— use provider default —</option>
+                        <option th:each="m : ${group.models()}"
+                                th:value="${m.modelId()}"
+                                th:text="${m.label()}"
+                                th:selected="${m.isDefault()}">
+                        </option>
+                    </select>
+                </div>
+                <!-- Placeholder shown before credentials are saved -->
+                <div class="mb-3" th:unless="${group.configured()}">
+                    <label class="form-label">Default Model</label>
+                    <p class="text-muted small mb-0">
+                        <i class="fa-solid fa-circle-info me-1"></i>Save your credentials above to discover available models.
+                    </p>
+                    <!-- Hidden select kept so JS can populate it after an inline save -->
+                    <select class="form-select mt-2 d-none" th:id="'model-' + ${group.providerKey()}">
+                        <option value="">— models will appear after configuring —</option>
+                    </select>
+                </div>
+
+                <!-- Enable toggle (not for Gemini) -->
+                <div class="mb-3 form-check" th:unless="${group.providerKey() == 'GEMINI' or group.providerKey() == 'BACKGROUND_SCHEDULER'}">
+                    <input type="checkbox" class="form-check-input"
+                           th:id="'enabled-' + ${group.providerKey()}"
+                           th:checked="${group.configured()}">
+                    <label class="form-check-label" th:for="'enabled-' + ${group.providerKey()}">Enabled</label>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-save me-1"></i>Save
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm"
+                            th:unless="${group.providerKey() == 'GEMINI' or group.providerKey() == 'BACKGROUND_SCHEDULER'}"
+                            th:attr="data-provider=${group.providerKey()}"
+                            onclick="deleteConfig(this.dataset.provider)"
+                    >
+                        <i class="fa-solid fa-trash me-1"></i>Remove
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Model list summary -->
+        <div class="card-footer text-muted small">
+            <span th:if="${group.configured() and not #lists.isEmpty(group.models())}">
+                <span class="me-2">Available models:</span>
+                <span th:each="m, stat : ${group.models()}">
+                    <span th:text="${m.label()}"></span><span th:unless="${stat.last}">, </span>
+                </span>
+            </span>
+            <span th:if="${group.configured() and #lists.isEmpty(group.models())}">
+                <i class="fa-solid fa-spinner fa-spin me-1"></i>No models discovered yet — try refreshing after saving credentials.
+            </span>
+            <span th:unless="${group.configured()}">
+                <i class="fa-solid fa-lock me-1"></i>Configure credentials to discover available models.
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+    function saveGlobalDefault() {
+        const sel = document.getElementById('global-default-select');
+        const val = sel ? sel.value : '';
+        if (!val) { showAlert('Please select a provider and model.', 'warning'); return; }
+        const sep = val.indexOf(':');
+        const provider = val.substring(0, sep);
+        const modelId  = val.substring(sep + 1);
+        fetch('/api/system/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ defaultProvider: provider, defaultModelId: modelId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                showAlert('Global default saved: ' + val.replace(':', ' — '), 'success');
+            } else {
+                showAlert('Error: ' + (data.error || 'Unknown error'), 'danger');
+            }
+        })
+        .catch(() => showAlert('Network error saving global default.', 'danger'));
+    }
+
+    function toggleForm(providerKey) {
+        const form = document.getElementById('form-' + providerKey);
+        if (!form) return;
+        const visible = form.style.display !== 'none';
+        form.style.display = visible ? 'none' : 'block';
+        // When opening: load current config values and refresh model list
+        if (!visible) {
+            loadConfig(providerKey);
+            loadDiscoveredModels(providerKey);
+        }
+    }
+
+    function loadConfig(providerKey) {
+        fetch('/api/ai/providers/' + providerKey + '/config')
+            .then(r => r.json())
+            .then(data => {
+                const baseUrlEl = document.getElementById('baseUrl-' + providerKey);
+                const modelEl   = document.getElementById('model-' + providerKey);
+                const enabledEl = document.getElementById('enabled-' + providerKey);
+                if (baseUrlEl && data.baseUrl) baseUrlEl.value = data.baseUrl;
+                if (modelEl && data.defaultModel) modelEl.value = data.defaultModel;
+                if (enabledEl) enabledEl.checked = data.enabled !== false;
+            })
+            .catch(() => {});
+    }
+
+    function loadDiscoveredModels(providerKey) {
+        const modelEl = document.getElementById('model-' + providerKey);
+        if (!modelEl) return Promise.resolve();
+        return fetch('/api/ai/models/' + providerKey.toLowerCase())
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(models => {
+                if (!models || models.length === 0) return;
+                // Build options preserving current selection
+                const current = modelEl.value;
+                modelEl.innerHTML = '<option value="">— use provider default —</option>';
+                models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.displayName || m.id;
+                    if (m.id === current) opt.selected = true;
+                    modelEl.appendChild(opt);
+                });
+                // Make the select visible if it was hidden
+                modelEl.classList.remove('d-none');
+                // Hide the "configure first" message
+                const hint = modelEl.closest('.mb-3')?.querySelector('p.text-muted');
+                if (hint) hint.classList.add('d-none');
+            })
+            .catch(() => {});
+    }
+
+    function saveConfig(event, providerKey) {
+        event.preventDefault();
+        const apiKeyEl  = document.getElementById('apiKey-'  + providerKey);
+        const baseUrlEl = document.getElementById('baseUrl-' + providerKey);
+        const modelEl   = document.getElementById('model-'   + providerKey);
+        const enabledEl = document.getElementById('enabled-' + providerKey);
+
+        const body = {
+            apiKey:       apiKeyEl  ? apiKeyEl.value.trim()  : null,
+            baseUrl:      baseUrlEl ? baseUrlEl.value.trim() : null,
+            defaultModel: modelEl   ? modelEl.value          : null,
+            enabled:      enabledEl ? enabledEl.checked      : true
+        };
+
+        fetch('/api/ai/providers/' + providerKey + '/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'OK') {
+                showAlert('Provider configuration saved.', 'success');
+                // Refresh the model dropdown for this provider without a full page reload
+                loadDiscoveredModels(providerKey).then(() => location.reload());
+            } else {
+                showAlert('Error: ' + (data.message || 'Unknown error'), 'danger');
+            }
+        })
+        .catch(() => showAlert('Network error saving configuration.', 'danger'));
+    }
+
+    function deleteConfig(providerKey) {
+        if (!confirm('Remove configuration for ' + providerKey + '? This will disconnect the provider.')) return;
+        fetch('/api/ai/providers/' + providerKey + '/config', { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'OK') {
+                    showAlert('Provider configuration removed.', 'warning');
+                    location.reload();
+                } else {
+                    showAlert('Error: ' + (data.message || 'Unknown error'), 'danger');
+                }
+            })
+            .catch(() => showAlert('Network error removing configuration.', 'danger'));
+    }
+
+    function showAlert(message, type) {
+        const area = document.getElementById('alert-area');
+        area.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show py-2 small" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+    }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/settings.js"></script>
+</body>
+</html>

@@ -30,6 +30,56 @@ let sessions    = [];
 let editingSessionUuid = null;
 let awaitingPostTerminalResponse = false;
 
+// Populated on page load from /api/chat/models
+let availableModels = [];
+
+// Load available provider/model options and populate the dropdown
+function loadAvailableModels() {
+    return fetch('/api/chat/models')
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.statusText); })
+        .then(function (groups) {
+            availableModels = groups;
+            providerSel.innerHTML = '';
+            groups.forEach(function (group) {
+                if (!group.configured) return; // only show configured providers
+                group.models.forEach(function (m) {
+                    const opt = document.createElement('option');
+                    opt.value = group.providerKey + ':' + m.modelId;
+                    opt.textContent = group.providerLabel + ' \u2014 ' + m.label;
+                    if (m.isDefault) opt.setAttribute('data-default', 'true');
+                    providerSel.appendChild(opt);
+                });
+            });
+            // Try to select the global default; fall back to first option
+            return fetch('/api/system/settings')
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (s) {
+                    if (s && s.defaultProvider && s.defaultModelId) {
+                        var key = s.defaultProvider + ':' + s.defaultModelId;
+                        var opt = providerSel.querySelector('option[value="' + key + '"]');
+                        if (opt) { providerSel.value = key; return; }
+                    }
+                    if (providerSel.options.length > 0 && !providerSel.value) {
+                        providerSel.selectedIndex = 0;
+                    }
+                })
+                .catch(function () {
+                    if (providerSel.options.length > 0 && !providerSel.value) {
+                        providerSel.selectedIndex = 0;
+                    }
+                });
+        })
+        .catch(function () { /* keep existing placeholder option */ });
+}
+
+/** Parse the combined PROVIDER:modelId value into {provider, modelId}. */
+function parseProviderModel(combined) {
+    if (!combined) return { provider: 'GEMINI', modelId: '' };
+    const sep = combined.indexOf(':');
+    if (sep === -1) return { provider: combined, modelId: '' };
+    return { provider: combined.substring(0, sep), modelId: combined.substring(sep + 1) };
+}
+
 const terminalState = {
     views: new Map(),
     pendingByTerminal: new Map(),
@@ -310,6 +360,14 @@ function renderAgentTransition(text) {
     const row = document.createElement('div');
     row.className = 'agent-transition-row';
     row.innerHTML = '<i class="fa-solid fa-gears" aria-hidden="true"></i><span>' + escapeHtml(text) + '</span>';
+    messagesArea.insertBefore(row, typingEl);
+    scrollBottom();
+}
+
+function renderModelSwitch(text) {
+    const row = document.createElement('div');
+    row.className = 'agent-transition-row';
+    row.innerHTML = '<i class="fa-solid fa-robot" aria-hidden="true"></i><span>' + escapeHtml(text) + '</span>';
     messagesArea.insertBefore(row, typingEl);
     scrollBottom();
 }
@@ -1516,10 +1574,12 @@ if (logoutBtn) {
         })
         .then(function (response) {
             // Spring Security redirect to /login?logout=true will be followed
+            sessionStorage.removeItem('splashShown');
             window.location.href = '/login?logout=true';
         })
         .catch(function (error) {
             console.error('Logout failed:', error);
+            sessionStorage.removeItem('splashShown');
             window.location.href = '/login?logout=true';
         });
     });
@@ -1778,7 +1838,9 @@ agentSel.addEventListener('change', function () {
 });
 
 function loadSession(targetSessionUuid) {
-    let url = '/api/chat/session?provider=' + encodeURIComponent(providerSel.value);
+    const { provider, modelId } = parseProviderModel(providerSel.value);
+    let url = '/api/chat/session?provider=' + encodeURIComponent(provider);
+    if (modelId) url += '&modelId=' + encodeURIComponent(modelId);
     if (targetSessionUuid) {
         url += '&sessionUuid=' + encodeURIComponent(targetSessionUuid);
     }
@@ -1805,8 +1867,16 @@ function loadSession(targetSessionUuid) {
                 subscribeToCurrentSession();
             }
 
-            if (data.provider && providerSel.querySelector('option[value="' + data.provider + '"]')) {
-                providerSel.value = data.provider;
+            if (data.provider) {
+                // Build combined key and try to select the matching option
+                const combinedKey = data.provider + ':' + (data.modelId || '');
+                const matchFull = providerSel.querySelector('option[value="' + combinedKey + '"]');
+                const matchProvider = providerSel.querySelector('option[value^="' + data.provider + ':"]');
+                if (matchFull) {
+                    providerSel.value = combinedKey;
+                } else if (matchProvider) {
+                    providerSel.value = matchProvider.value;
+                }
             }
 
             loadSessionList();
@@ -1816,7 +1886,7 @@ function loadSession(targetSessionUuid) {
             if (messages.length === 0) {
                 showTyping(true);
                 setInputEnabled(false);
-                fetch('/api/chat/welcome?provider=' + encodeURIComponent(providerSel.value))
+                fetch('/api/chat/welcome?provider=' + encodeURIComponent(provider))
                     .then(function (resp) { return resp.ok ? resp.json() : Promise.reject(resp.statusText); })
                     .then(function (welcome) {
                         showTyping(false);
@@ -1843,7 +1913,10 @@ function loadSession(targetSessionUuid) {
 }
 
 function createNewChat() {
-    fetch('/api/chat/session/new?provider=' + encodeURIComponent(providerSel.value))
+    const { provider, modelId } = parseProviderModel(providerSel.value);
+    let url = '/api/chat/session/new?provider=' + encodeURIComponent(provider);
+    if (modelId) url += '&modelId=' + encodeURIComponent(modelId);
+    fetch(url)
         .then(function (resp) {
             if (!resp.ok) { throw new Error('HTTP ' + resp.status + ' — ' + resp.statusText); }
             return resp.json();
@@ -1916,7 +1989,7 @@ chatForm.addEventListener('submit', function (e) {
         body: JSON.stringify({
             sessionUuid:     sessionUuid,
             content:         content,
-            provider:        providerSel.value,
+            provider:        parseProviderModel(providerSel.value).provider,
             attachmentUuids: attachmentUuids
         })
     });
@@ -1933,15 +2006,26 @@ const welcomeSignal = (function () {
 
 (function runSplash() {
     const splash     = document.getElementById('splash');
+    const chatLayout = document.querySelector('.chat-layout');
+
+    // Skip the splash entirely when navigating back from another page
+    // (splash was already shown during this browser session / login).
+    if (sessionStorage.getItem('splashShown')) {
+        splash.remove();
+        chatLayout.classList.add('visible');
+        welcomeSignal.resolve();
+        return;
+    }
+
     const splashImg  = splash.querySelector('img');
     const taglineEl  = document.getElementById('splash-tagline');
     const typedEl    = document.getElementById('splash-typed');
     const cursorEl   = document.getElementById('splash-cursor');
-    const chatLayout = document.querySelector('.chat-layout');
 
     const SPLASH_MESSAGE = 'Loading the Vork Concierge...';
 
     function dismissSplash() {
+        sessionStorage.setItem('splashShown', '1');
         cursorEl.classList.remove('blink');
         cursorEl.style.opacity = '0';
         splashImg.classList.add('glitch');
@@ -1983,4 +2067,23 @@ const welcomeSignal = (function () {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
-initSession();
+// Load available provider/model options first, then initialise the session.
+// The dropdown is pre-seeded with a Gemini placeholder so the UI is usable
+// even if the models endpoint is slow.
+loadAvailableModels().then(function () { initSession(); }).catch(function () { initSession(); });
+
+// When the user switches provider/model, persist the choice to the active session.
+providerSel.addEventListener('change', function () {
+    if (!sessionUuid) return;
+    const { provider, modelId } = parseProviderModel(providerSel.value);
+    const selectedOpt = providerSel.options[providerSel.selectedIndex];
+    const label = selectedOpt ? selectedOpt.text : (provider + (modelId ? ' \u2014 ' + modelId : ''));
+    renderModelSwitch('Switched to ' + label);
+    fetch('/api/chat/session/' + encodeURIComponent(sessionUuid) + '/model', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: provider, modelId: modelId })
+    }).catch(function (err) {
+        console.warn('Failed to update session model:', err);
+    });
+});

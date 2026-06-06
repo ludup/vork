@@ -70,7 +70,7 @@ class ChatServiceSessionBindingTest {
                 0,
                 List.of(),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING, null));
+                AiSessionStatus.RUNNING, null, null));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new TestingAuthenticationToken("bob", "pw"));

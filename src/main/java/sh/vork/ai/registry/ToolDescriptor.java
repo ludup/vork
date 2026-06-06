@@ -18,6 +18,9 @@ package sh.vork.ai.registry;
  * @param restricted      {@code true} when the {@code @Bean} factory method is
  *                        annotated with {@link sh.vork.ai.security.Restricted},
  *                        meaning the tool enforces authorization checks at runtime
+ * @param hidden          {@code true} when the {@code @Bean} factory method is
+ *                        annotated with {@link Hidden}, meaning the tool is excluded
+ *                        from the public registry and must be injected per-session
  */
 public record ToolDescriptor(
         String  id,
@@ -26,5 +29,6 @@ public record ToolDescriptor(
         String  category,
         String  description,
         String  parameterSchema,
-        boolean restricted
+        boolean restricted,
+        boolean hidden
 ) {}

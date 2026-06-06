@@ -13,6 +13,7 @@ package sh.vork.ai;
 public enum AiProvider {
     GEMINI,
     OPENAI,
+    OLLAMA,
     ANTHROPIC,
     BACKGROUND_SCHEDULER
 }

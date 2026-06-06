@@ -6,6 +6,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import sh.vork.ai.context.ToolExecutionContext;
@@ -15,6 +17,7 @@ import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.service.ChatService;
+import sh.vork.ai.session.SessionToolStore;
 import com.jadaptive.orm.DatabaseRepository;
 
 @Service
@@ -27,18 +30,28 @@ public class BackgroundOrchestrationEngine {
     private final ChatService chatService;
     private final DatabaseRepository<AiSession> sessionRepository;
     private final BackgroundExecutionContext executionContext;
+    private final SessionToolStore sessionToolStore;
+    private final ToolCallback completeBackgroundTask;
 
     public BackgroundOrchestrationEngine(ChatService chatService,
                                          DatabaseRepository<AiSession> sessionRepository,
-                                         BackgroundExecutionContext executionContext) {
+                                         BackgroundExecutionContext executionContext,
+                                         SessionToolStore sessionToolStore,
+                                         @Qualifier("completeBackgroundTask") ToolCallback completeBackgroundTask) {
         this.chatService = chatService;
         this.sessionRepository = sessionRepository;
         this.executionContext = executionContext;
+        this.sessionToolStore = sessionToolStore;
+        this.completeBackgroundTask = completeBackgroundTask;
     }
 
     public void executeBackgroundTurn(String sessionUuid, String initialPrompt) {
         String prompt = (initialPrompt == null || initialPrompt.isBlank()) ? CONTINUE_PROMPT : initialPrompt;
         boolean firstRound = true;
+
+        // Register completeBackgroundTask for this session only; it is a hidden tool
+        // that signals graceful termination and must not be globally available.
+        sessionToolStore.addTool(sessionUuid, completeBackgroundTask);
 
         try {
             while (true) {
@@ -68,7 +81,8 @@ public class BackgroundOrchestrationEngine {
                             List.copyOf(updated),
                             session.environmentVariables(),
                             AiSessionStatus.FAILED_MAX_ROUNDS,
-                            session.activeAgentTemplateId()));
+                            session.activeAgentTemplateId(),
+                            session.modelId()));
                     log.warn("Background loop stopped at max rounds [session={}]", sessionUuid);
                     return;
                 }
@@ -84,18 +98,27 @@ public class BackgroundOrchestrationEngine {
                         session.messages(),
                         session.environmentVariables(),
                         AiSessionStatus.RUNNING,
-                        session.activeAgentTemplateId()));
+                        session.activeAgentTemplateId(),
+                        session.modelId()));
 
                 executionContext.clear();
                     ToolExecutionContext.bindSessionUuid(sessionUuid);
                     ToolExecutionContext.hydrate(session.environmentVariables());
 
                 try (MDC.MDCCloseable _ = MDC.putCloseable("sessionUuid", sessionUuid)) {
+                    // Use the session's stored provider so job-level overrides take effect.
+                    // Fall back to BACKGROUND_SCHEDULER for legacy/authorization-resume flows.
+                    AiProvider provider = AiProvider.BACKGROUND_SCHEDULER;
+                    try {
+                        if (session.provider() != null && !session.provider().isBlank()) {
+                            provider = AiProvider.valueOf(session.provider());
+                        }
+                    } catch (IllegalArgumentException ignored) {}
                     chatService.sendMessage(
                             sessionUuid,
                             firstRound ? prompt : CONTINUE_PROMPT,
                             List.of(),
-                            AiProvider.BACKGROUND_SCHEDULER);
+                            provider);
                 } catch (ToolSuspensionException ex) {
                     log.info("Background loop paused by authorization fence [session={}, tool={}]", sessionUuid,
                             ex.getToolName());
@@ -118,6 +141,7 @@ public class BackgroundOrchestrationEngine {
                 }
             }
         } finally {
+            sessionToolStore.clearSession(sessionUuid);
             executionContext.clear();
             ToolExecutionContext.clear();
         }

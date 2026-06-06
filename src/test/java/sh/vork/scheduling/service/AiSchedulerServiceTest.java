@@ -21,10 +21,17 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import sh.vork.ai.entity.AiSession;
 import com.jadaptive.orm.DatabaseRepository;
 import sh.vork.scheduling.domain.DurationType;
+import sh.vork.scheduling.domain.InvocationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;
 
 class AiSchedulerServiceTest {
+
+    private static ScheduledJob job(String id, InvocationType type, long repeatDuration,
+                                    DurationType durationType, Instant start, ScheduledJobStatus status) {
+        return new ScheduledJob(id, "Job " + id, "prompt", "sid", "alice",
+                type, start, repeatDuration, durationType, 0L, 0L, null, null, null, status);
+    }
 
     @Test
     void scheduleJob_oneShot_persistsAndSchedulesOnce() {
@@ -40,19 +47,11 @@ class AiSchedulerServiceTest {
 
         AiSchedulerService service = new AiSchedulerService(scheduler, repo, orchestrationEngine, sessionRepo);
 
-        Instant start = Instant.parse("2026-05-17T10:15:30Z");
-        ScheduledJob job = new ScheduledJob(
-                "job-1",
-            "Job One",
-                "Do work",
-                "sid-1",
-                "alice",
-                start,
-                0,
-                DurationType.MINUTES,
-                ScheduledJobStatus.ACTIVE);
+        Instant start = Instant.parse("2099-05-17T10:15:30Z"); // future so effectiveStart == start
+        ScheduledJob jobIn = job("job-1", InvocationType.ONE_TIME, 0, DurationType.MINUTES, start,
+                ScheduledJobStatus.WAITING);
 
-        ScheduledJob out = service.scheduleJob(job);
+        ScheduledJob out = service.scheduleJob(jobIn);
 
         assertEquals("job-1", out.id());
         verify(scheduler).schedule(any(Runnable.class), eq(start));
@@ -60,7 +59,7 @@ class AiSchedulerServiceTest {
         ArgumentCaptor<ScheduledJob> saved = ArgumentCaptor.forClass(ScheduledJob.class);
         verify(repo).save(saved.capture());
         assertEquals("job-1", saved.getValue().id());
-        assertEquals(ScheduledJobStatus.ACTIVE, saved.getValue().status());
+        assertEquals(ScheduledJobStatus.WAITING, saved.getValue().status());
     }
 
     @Test
@@ -74,23 +73,15 @@ class AiSchedulerServiceTest {
         @SuppressWarnings("rawtypes")
         ScheduledFuture future = mock(ScheduledFuture.class);
         doReturn(future).when(scheduler)
-            .scheduleAtFixedRate(any(Runnable.class), any(Instant.class), any(Duration.class));
+                .scheduleAtFixedRate(any(Runnable.class), any(Instant.class), any(Duration.class));
 
         AiSchedulerService service = new AiSchedulerService(scheduler, repo, orchestrationEngine, sessionRepo);
 
-        Instant start = Instant.parse("2026-05-17T10:15:30Z");
-        ScheduledJob job = new ScheduledJob(
-                "job-2",
-            "Job Two",
-                "Repeat",
-                "sid-2",
-                "bob",
-                start,
-                2,
-                DurationType.HOURS,
-                ScheduledJobStatus.ACTIVE);
+        Instant start = Instant.parse("2099-05-17T10:15:30Z");
+        ScheduledJob jobIn = job("job-2", InvocationType.REPEAT, 2, DurationType.HOURS, start,
+                ScheduledJobStatus.WAITING);
 
-        service.scheduleJob(job);
+        service.scheduleJob(jobIn);
 
         verify(scheduler).scheduleAtFixedRate(any(Runnable.class), eq(start), eq(Duration.ofHours(2)));
     }
@@ -109,22 +100,15 @@ class AiSchedulerServiceTest {
 
         AiSchedulerService service = new AiSchedulerService(scheduler, repo, orchestrationEngine, sessionRepo);
 
-        ScheduledJob job = new ScheduledJob(
-                " ",
-            "Generated Job",
-                "One shot",
-                "sid-3",
-                "charlie",
-                null,
-                0,
-                null,
-                null);
+        // Null durationType and status — service should default them
+        ScheduledJob jobIn = new ScheduledJob(" ", "Generated Job", "One shot", "sid-3", "charlie",
+                InvocationType.ONE_TIME, null, 0, null, 0L, 0L, null, null, null, null);
 
-        ScheduledJob out = service.scheduleJob(job);
+        ScheduledJob out = service.scheduleJob(jobIn);
 
         assertNotNull(out.id());
-        assertEquals(DurationType.SECONDS, out.durationType());
-        assertEquals(ScheduledJobStatus.ACTIVE, out.status());
+        assertEquals(DurationType.MINUTES, out.durationType());
+        assertEquals(ScheduledJobStatus.WAITING, out.status());
 
         ArgumentCaptor<ScheduledJob> saved = ArgumentCaptor.forClass(ScheduledJob.class);
         verify(repo).save(saved.capture());
@@ -132,7 +116,7 @@ class AiSchedulerServiceTest {
     }
 
     @Test
-    void cancelJob_cancelsFutureAndMarksPaused() {
+    void pauseJob_cancelsFutureAndMarksPaused() {
         ThreadPoolTaskScheduler scheduler = mock(ThreadPoolTaskScheduler.class);
         @SuppressWarnings("unchecked")
         DatabaseRepository<ScheduledJob> repo = mock(DatabaseRepository.class);
@@ -145,23 +129,16 @@ class AiSchedulerServiceTest {
 
         AiSchedulerService service = new AiSchedulerService(scheduler, repo, orchestrationEngine, sessionRepo);
 
-        ScheduledJob existing = new ScheduledJob(
-                "job-3",
-            "Pause Job",
-                "Prompt",
-                "sid-4",
-                "dana",
-                Instant.parse("2026-05-17T10:15:30Z"),
-                0,
-                DurationType.SECONDS,
-                ScheduledJobStatus.ACTIVE);
+        Instant start = Instant.parse("2099-05-17T10:15:30Z");
+        ScheduledJob existing = job("job-3", InvocationType.ONE_TIME, 0, DurationType.MINUTES, start,
+                ScheduledJobStatus.WAITING);
 
         service.scheduleJob(existing);
         when(repo.get("job-3")).thenReturn(existing);
 
-        service.cancelJob("job-3");
+        service.pauseJob("job-3");
 
-        verify(future).cancel(true);
+        verify(future).cancel(false);
 
         ArgumentCaptor<ScheduledJob> saved = ArgumentCaptor.forClass(ScheduledJob.class);
         verify(repo, times(2)).save(saved.capture());

@@ -36,6 +36,7 @@ import sh.vork.ai.function.CompileTypeRequest;
 import sh.vork.ai.function.ExecuteTerminalCommandRequest;
 import sh.vork.ai.security.AuthorizationRuleEngine;
 import sh.vork.ai.registry.ToolCategory;
+import sh.vork.ai.registry.Hidden;
 import sh.vork.ai.security.Restricted;
 import sh.vork.ai.security.SecuredToolCallback;
 import sh.vork.ai.security.VisualizableToolCallback;
@@ -171,28 +172,37 @@ public class AiConfig {
     }
 
     private static boolean isRestrictedTool(ConfigurableListableBeanFactory beanFactory, String toolName) {
+        return readBeanMethodAnnotation(beanFactory, toolName, Restricted.class) != null;
+    }
+
+    private static boolean isHiddenTool(ConfigurableListableBeanFactory beanFactory, String toolName) {
+        return readBeanMethodAnnotation(beanFactory, toolName, Hidden.class) != null;
+    }
+
+    private static <A extends java.lang.annotation.Annotation> A readBeanMethodAnnotation(
+            ConfigurableListableBeanFactory beanFactory, String toolName, Class<A> annotationType) {
         if (!beanFactory.containsBeanDefinition(toolName)) {
-            return false;
+            return null;
         }
         BeanDefinition bd = beanFactory.getBeanDefinition(toolName);
         String factoryBeanName = bd.getFactoryBeanName();
         String factoryMethodName = bd.getFactoryMethodName();
         if (factoryBeanName == null || factoryMethodName == null) {
-            return false;
+            return null;
         }
         try {
             Object factoryBean = beanFactory.getBean(factoryBeanName);
             Class<?> targetClass = ClassUtils.getUserClass(factoryBean);
             for (Method method : targetClass.getDeclaredMethods()) {
                 if (method.getName().equals(factoryMethodName)
-                        && method.isAnnotationPresent(Restricted.class)) {
-                    return true;
+                        && method.isAnnotationPresent(annotationType)) {
+                    return method.getAnnotation(annotationType);
                 }
             }
         } catch (Exception ignored) {
-            return false;
+            return null;
         }
-        return false;
+        return null;
     }
 
     // -------------------------------------------------------------------------
@@ -241,6 +251,9 @@ public class AiConfig {
         Map<String, ToolCallback> map = new LinkedHashMap<>();
         toolCallbacks.forEach(tool -> {
             String toolName = tool.getToolDefinition().name();
+            if (isHiddenTool(beanFactory, toolName)) {
+                return; // hidden tools are injected per-session via SessionToolStore
+            }
             ToolCallback secured = isRestrictedTool(beanFactory, toolName)
                     ? new SecuredToolCallback(tool, authorizationRuleEngine)
                     : tool;
@@ -313,6 +326,7 @@ public class AiConfig {
     // -------------------------------------------------------------------------
 
     @Bean
+    @Hidden
     @ToolCategory("Scheduling")
     public ToolCallback completeBackgroundTask(DatabaseRepository<AiSession> aiSessionRepository,
                                                BackgroundExecutionContext backgroundExecutionContext) {
@@ -344,7 +358,8 @@ public class AiConfig {
                             session.messages(),
                             session.environmentVariables(),
                             AiSessionStatus.COMPLETED,
-                            session.activeAgentTemplateId()));
+                            session.activeAgentTemplateId(),
+                            session.modelId()));
 
                     backgroundExecutionContext.markExecutionComplete();
                     return "{\"status\":\"shutdown_initiated\"}";

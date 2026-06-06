@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Notifications — Vork</title>
+    <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+    .tg-qr-wrap { display:flex; flex-direction:column; align-items:center; gap:0.75rem; }
+    #tg-qr-canvas { border-radius: 0.5rem; }
+</style>
+</head>
+<body>
+<div th:replace="~{fragments/header :: header}"></div>
+
+<div class="container py-5" style="max-width: 800px;">
+    <h2 class="mb-1"><i class="fa-solid fa-bell me-2"></i>My Notifications</h2>
+    <p class="text-muted mb-4">Manage the addresses where you receive notifications.</p>
+
+    <div id="alert-area" class="mb-3"></div>
+
+    <!-- No providers configured -->
+    <div id="no-providers-state" class="alert alert-warning d-none">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+        No notification providers have been configured yet. Ask your administrator to set one up under
+        <strong>Settings → Notifications</strong>.
+    </div>
+
+    <!-- Media table -->
+    <div id="media-table-wrap" class="d-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Your addresses</h5>
+            <button class="btn btn-primary btn-sm" onclick="openAddModal()">
+                <i class="fa-solid fa-plus me-1"></i>Add address
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:120px">Type</th>
+                        <th>Address</th>
+                        <th>Label</th>
+                        <th>Provider</th>
+                        <th style="width:100px" class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="media-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Empty state (providers exist but no media added) -->
+    <div id="empty-state" class="text-center text-muted py-5 d-none">
+        <i class="fa-solid fa-bell-slash fa-2x mb-3 d-block"></i>
+        <p class="mb-3">No notification addresses added yet.</p>
+        <button class="btn btn-primary" onclick="openAddModal()">
+            <i class="fa-solid fa-plus me-1"></i>Add your first address
+        </button>
+    </div>
+</div>
+
+<!-- ─── Add Media Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addModalLabel">Add notification address</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: provider -->
+                <div id="add-step-provider">
+                    <div class="mb-3">
+                        <label class="form-label" for="add-provider-select">
+                            Notification provider <span class="text-danger">*</span>
+                        </label>
+                        <select id="add-provider-select" class="form-select" onchange="onProviderChange()">
+                            <option value="">— select a provider —</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Step 2: address fields (shown after provider selection for email/phone) -->
+                <div id="add-step-address" style="display:none;">
+                    <div class="mb-3">
+                        <label class="form-label" for="add-address" id="add-address-label">Address</label>
+                        <input type="text" id="add-address" class="form-control"
+                               oninput="clearFieldError('add-address')">
+                        <div id="add-address-error" class="invalid-feedback"></div>
+                        <div id="add-address-hint" class="form-text text-muted"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="add-label">
+                            Label <span class="text-muted small">(optional)</span>
+                        </label>
+                        <input type="text" id="add-label" class="form-control" placeholder="e.g. Work email">
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="add-default" checked>
+                        <label class="form-check-label small" for="add-default">
+                            Set as my default notification address
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Step 2b: Telegram QR registration -->
+                <div id="add-step-telegram" style="display:none;">
+                    <div class="tg-qr-wrap py-2">
+                        <div id="tg-loading" class="text-center">
+                            <span class="spinner-border spinner-border-sm text-primary me-2"></span>
+                            <span class="small text-muted">Fetching bot info&hellip;</span>
+                        </div>
+                        <canvas id="tg-qr-canvas" class="d-none"></canvas>
+                        <div id="tg-link-wrap" class="d-none text-center">
+                            <p class="small text-muted mb-1">
+                                Scan with Telegram &mdash; or
+                                <a id="tg-deep-link" href="#" target="_blank" rel="noopener">tap this link</a>
+                                on your phone.
+                            </p>
+                        </div>
+                        <div id="tg-status-msg" class="small text-center"></div>
+                    </div>
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" id="tg-default" checked>
+                        <label class="form-check-label small" for="tg-default">
+                            Set as my default notification address
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btn-add-save" class="btn btn-primary" style="display:none;"
+                        onclick="saveMedia()">
+                    <i class="fa-solid fa-save me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+    let addModal;
+    let allMedia     = [];
+    let allProviders = [];   // ProviderView from server
+    let activeTgRegistrationId = null;
+    let tgPollTimer = null;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        addModal = new bootstrap.Modal(document.getElementById('addModal'));
+        document.getElementById('addModal').addEventListener('hidden.bs.modal', onModalHidden);
+        loadAll();
+    });
+
+    async function loadAll() {
+        try {
+            const [mRes, pRes] = await Promise.all([
+                fetch('/api/user/notification-media'),
+                fetch('/api/user/notification-media/providers')
+            ]);
+            allMedia     = mRes.ok ? await mRes.json() : [];
+            allProviders = pRes.ok ? await pRes.json() : [];
+            renderAll();
+        } catch (e) {
+            showAlert('Failed to load notification data.', 'warning');
+        }
+    }
+
+    function renderAll() {
+        const noProviders  = document.getElementById('no-providers-state');
+        const tableWrap    = document.getElementById('media-table-wrap');
+        const emptyState   = document.getElementById('empty-state');
+
+        if (allProviders.length === 0) {
+            noProviders.classList.remove('d-none');
+            tableWrap.classList.add('d-none');
+            emptyState.classList.add('d-none');
+            return;
+        }
+        noProviders.classList.add('d-none');
+
+        if (allMedia.length === 0) {
+            tableWrap.classList.add('d-none');
+            emptyState.classList.remove('d-none');
+        } else {
+            emptyState.classList.add('d-none');
+            tableWrap.classList.remove('d-none');
+            renderTable();
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('media-tbody');
+        tbody.innerHTML = '';
+        allMedia.forEach(function (m) {
+            const provider = allProviders.find(function (p) { return p.providerKey === m.providerKey; });
+            const providerLabel = provider ? provider.configDisplayName : m.providerKey;
+            const mediaTypeBadge = mediaTypeBadgeHtml(m.mediaType);
+            const defaultBtn = m.isDefault
+                ? '<button class="btn btn-sm btn-link p-0 text-warning" title="Default address" disabled><i class="fa-solid fa-star"></i></button>'
+                : '<button class="btn btn-sm btn-link p-0 text-muted" title="Set as default" onclick="setDefault(\'' + m.uuid + '\')"><i class="fa-regular fa-star"></i></button>';
+            const row = document.createElement('tr');
+            row.id = 'row-' + m.uuid;
+            row.innerHTML =
+                '<td>' + mediaTypeBadge + '</td>' +
+                '<td class="fw-semibold font-monospace small">' + escapeHtml(m.address) + '</td>' +
+                '<td class="text-muted small">' + escapeHtml(m.label || '') + '</td>' +
+                '<td><span class="badge bg-secondary">' + escapeHtml(providerLabel) + '</span></td>' +
+                '<td class="text-center">' +
+                '  <div class="d-flex justify-content-center gap-2">' +
+                '    ' + defaultBtn +
+                '    <button class="btn btn-sm btn-link p-0 text-danger" title="Delete" onclick="deleteMedia(\'' + m.uuid + '\')">' +
+                '      <i class="fa-solid fa-trash-can"></i>' +
+                '    </button>' +
+                '  </div>' +
+                '</td>';
+            tbody.appendChild(row);
+        });
+    }
+
+    function mediaTypeBadgeHtml(mediaType) {
+        const badges = {
+            'EMAIL_ADDRESS': '<span class="badge bg-info text-dark"><i class="fa-solid fa-envelope me-1"></i>Email</span>',
+            'PHONE_NUMBER':  '<span class="badge bg-success"><i class="fa-solid fa-phone me-1"></i>Phone</span>',
+            'TELEGRAM':      '<span class="badge bg-primary"><i class="fa-brands fa-telegram me-1"></i>Telegram</span>'
+        };
+        return badges[mediaType] || '<span class="badge bg-secondary">' + escapeHtml(mediaType) + '</span>';
+    }
+
+    // ── Add modal ─────────────────────────────────────────────────────────────
+    function openAddModal() {
+        resetAddModal();
+        const sel = document.getElementById('add-provider-select');
+        sel.innerHTML = '<option value="">\u2014 select a provider \u2014</option>';
+        allProviders.forEach(function (p) {
+            const opt = document.createElement('option');
+            opt.value        = p.configId;
+            opt.dataset.key  = p.providerKey;
+            opt.textContent  = p.configDisplayName + ' (' + p.providerDisplayName + ')';
+            sel.appendChild(opt);
+        });
+        addModal.show();
+    }
+
+    function onProviderChange() {
+        const sel     = document.getElementById('add-provider-select');
+        const configId = sel.value;
+        const stepAddr = document.getElementById('add-step-address');
+        const stepTg   = document.getElementById('add-step-telegram');
+        const saveBtn  = document.getElementById('btn-add-save');
+        if (!configId) {
+            stepAddr.style.display = 'none';
+            stepTg.style.display   = 'none';
+            saveBtn.style.display  = 'none';
+            return;
+        }
+        const pv = allProviders.find(function (p) { return p.configId === configId; });
+        if (!pv) return;
+
+        if (pv.mediaType === 'TELEGRAM') {
+            stepAddr.style.display = 'none';
+            saveBtn.style.display  = 'none';
+            stepTg.style.display   = '';
+            startTelegramRegistration(pv.configId);
+        } else {
+            stepTg.style.display   = 'none';
+            document.getElementById('add-address-label').textContent = mediaTypeLabel(pv.mediaType) + ' *';
+            document.getElementById('add-address').placeholder       = pv.addressPlaceholder;
+            document.getElementById('add-address-hint').textContent  = pv.addressHint;
+            document.getElementById('add-address').value             = '';
+            stepAddr.style.display = '';
+            saveBtn.style.display  = '';
+        }
+    }
+
+    function mediaTypeLabel(t) {
+        if (t === 'EMAIL_ADDRESS') return 'Email address';
+        if (t === 'PHONE_NUMBER')  return 'Phone number';
+        if (t === 'TELEGRAM')      return 'Telegram handle / chat ID';
+        return 'Address';
+    }
+
+    // ── Telegram registration ──────────────────────────────────────────────
+    async function startTelegramRegistration(configId) {
+        stopTgPoll();
+        activeTgRegistrationId = null;
+
+        const loadingEl = document.getElementById('tg-loading');
+        const canvas    = document.getElementById('tg-qr-canvas');
+        const linkWrap  = document.getElementById('tg-link-wrap');
+        const statusEl  = document.getElementById('tg-status-msg');
+
+        loadingEl.style.display = '';
+        canvas.classList.add('d-none');
+        linkWrap.classList.add('d-none');
+        statusEl.textContent = '';
+
+        const isDefault = document.getElementById('tg-default').checked;
+        try {
+            const res = await fetch('/api/user/notification-media/telegram/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ providerConfigId: configId, isDefault: isDefault })
+            });
+            const data = await res.json();
+            if (!res.ok) { statusEl.textContent = data.error || 'Failed to start registration.'; return; }
+
+            activeTgRegistrationId = data.registrationId;
+
+            // Render QR code
+            loadingEl.style.display = 'none';
+            QRCode.toCanvas(canvas, data.url, { width: 200, margin: 2 }, function (err) {
+                if (!err) canvas.classList.remove('d-none');
+            });
+            document.getElementById('tg-deep-link').href = data.url;
+            linkWrap.classList.remove('d-none');
+            statusEl.innerHTML = '<span class="text-muted"><span class="spinner-grow spinner-grow-sm me-1"></span>Waiting for scan&hellip;</span>';
+
+            // Start polling
+            tgPollTimer = setInterval(pollTgStatus, 2000);
+        } catch (e) {
+            loadingEl.style.display = 'none';
+            statusEl.textContent = 'Network error. Please try again.';
+        }
+    }
+
+    async function pollTgStatus() {
+        if (!activeTgRegistrationId) return;
+        try {
+            const res  = await fetch('/api/user/notification-media/telegram/register/' + activeTgRegistrationId);
+            const data = await res.json();
+            if (data.status === 'complete') {
+                stopTgPoll();
+                addModal.hide();
+                await loadAll();
+                showAlert('Telegram account linked successfully!', 'success');
+            } else if (data.status === 'expired') {
+                stopTgPoll();
+                document.getElementById('tg-status-msg').innerHTML =
+                    '<span class="text-danger">Registration expired. Please try again.</span>';
+                activeTgRegistrationId = null;
+            }
+        } catch (e) { /* ignore transient network errors */ }
+    }
+
+    function stopTgPoll() {
+        if (tgPollTimer) { clearInterval(tgPollTimer); tgPollTimer = null; }
+    }
+
+    function onModalHidden() {
+        stopTgPoll();
+        if (activeTgRegistrationId) {
+            fetch('/api/user/notification-media/telegram/register/' + activeTgRegistrationId,
+                  { method: 'DELETE' }).catch(function() {});
+            activeTgRegistrationId = null;
+        }
+        resetAddModal();
+    }
+
+    function resetAddModal() {
+        document.getElementById('add-provider-select').value     = '';
+        document.getElementById('add-address').value             = '';
+        document.getElementById('add-address').classList.remove('is-invalid');
+        document.getElementById('add-address-error').textContent = '';
+        document.getElementById('add-label').value               = '';
+        document.getElementById('add-default').checked           = true;
+        document.getElementById('add-step-address').style.display  = 'none';
+        document.getElementById('add-step-telegram').style.display = 'none';
+        document.getElementById('btn-add-save').style.display       = 'none';
+        // reset telegram panel state
+        document.getElementById('tg-loading').style.display = '';
+        document.getElementById('tg-qr-canvas').classList.add('d-none');
+        document.getElementById('tg-link-wrap').classList.add('d-none');
+        document.getElementById('tg-status-msg').textContent = '';
+    }
+
+    async function saveMedia() {
+        const sel         = document.getElementById('add-provider-select');
+        const providerKey = sel.options[sel.selectedIndex]?.dataset.key || '';
+        const address     = document.getElementById('add-address').value.trim();
+        const label       = document.getElementById('add-label').value.trim();
+        const isDefault   = document.getElementById('add-default').checked;
+
+        clearFieldError('add-address');
+        if (!address) { setFieldError('add-address', 'add-address-error', 'Address is required.'); return; }
+
+        const btn = document.getElementById('btn-add-save');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+
+        try {
+            const res = await fetch('/api/user/notification-media', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ providerKey, address, label, isDefault })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (data.addressError) {
+                    setFieldError('add-address', 'add-address-error', data.addressError);
+                } else {
+                    showAlert(data.error || 'Failed to save.', 'danger');
+                }
+                return;
+            }
+            addModal.hide();
+            await loadAll();
+            showAlert('Address saved.', 'success');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save';
+        }
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+    async function setDefault(id) {
+        try {
+            const res = await fetch('/api/user/notification-media/' + id + '/default', { method: 'PUT' });
+            if (res.ok) { await loadAll(); showAlert('Default address updated.', 'success'); }
+            else showAlert('Failed to update default.', 'danger');
+        } catch (e) { showAlert('Network error.', 'danger'); }
+    }
+
+    async function deleteMedia(id) {
+        if (!confirm('Remove this notification address?')) return;
+        try {
+            const res = await fetch('/api/user/notification-media/' + id, { method: 'DELETE' });
+            if (res.ok) { await loadAll(); }
+            else showAlert('Failed to delete.', 'danger');
+        } catch (e) { showAlert('Network error.', 'danger'); }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function showAlert(msg, type) {
+        const area = document.getElementById('alert-area');
+        area.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
+            escapeHtml(msg) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+    }
+    function setFieldError(inputId, errorId, msg) {
+        document.getElementById(inputId).classList.add('is-invalid');
+        document.getElementById(errorId).textContent = msg;
+    }
+    function clearFieldError(inputId) {
+        document.getElementById(inputId).classList.remove('is-invalid');
+    }
+    function escapeHtml(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+</script>
+</body>
+</html>

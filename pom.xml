@@ -54,6 +54,20 @@
             <version>${spring-ai.version}</version>
         </dependency>
 
+        <!-- Spring AI — OpenAI model classes (no Spring Boot auto-configuration) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+
+        <!-- Spring AI — Ollama model classes (no Spring Boot auto-configuration) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-ollama</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+
         <!-- Spring Boot core -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -155,6 +169,25 @@
         	<groupId>com.jadaptive</groupId>
         	<artifactId>jadaptive-hsm</artifactId>
         	<version>0.0.1-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Spring Mail: Jakarta Mail / SMTP support (JavaMailSenderImpl) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- libphonenumber: phone number parsing and validation -->
+        <dependency>
+            <groupId>com.googlecode.libphonenumber</groupId>
+            <artifactId>libphonenumber</artifactId>
+            <version>8.13.49</version>
         </dependency>
 
         <!-- Test -->

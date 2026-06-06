@@ -318,6 +318,10 @@ body.sidebar-collapsed .sidebar-top {
     font-size: 0.72rem;
 }
 
+.agent-transition-row .fa-robot {
+    font-size: 0.72rem;
+}
+
 .prompt-title {
     font-weight: 600;
     margin-bottom: 0.3rem;

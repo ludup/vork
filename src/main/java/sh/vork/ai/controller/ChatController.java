@@ -14,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -24,6 +25,7 @@ import sh.vork.ai.AiProvider;
 import sh.vork.ai.entity.AiChatMessage;
 import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.protocol.UiEventFrame;
+import sh.vork.ai.provider.AiModelService;
 import sh.vork.ai.service.AiOrchestrationService;
 import sh.vork.ai.service.ChatService;
 import sh.vork.ai.terminal.TerminalStreamRouter;
@@ -49,6 +51,7 @@ public class ChatController {
     private final SimpMessagingTemplate  messaging;
     private final AiOrchestrationService aiOrchestrationService;
     private final TerminalStreamRouter   terminalStreamRouter;
+    private final AiModelService         modelService;
 
     private static final String WELCOME_PROMPT =
             "You are Vork the Concierge, an intelligent assistant that can perform tasks for the user " +
@@ -58,11 +61,13 @@ public class ChatController {
 
     public ChatController(ChatService chatService, SimpMessagingTemplate messaging,
                           AiOrchestrationService aiOrchestrationService,
-                          TerminalStreamRouter terminalStreamRouter) {
+                          TerminalStreamRouter terminalStreamRouter,
+                          AiModelService modelService) {
         this.chatService = chatService;
         this.messaging   = messaging;
         this.aiOrchestrationService = aiOrchestrationService;
         this.terminalStreamRouter = terminalStreamRouter;
+        this.modelService = modelService;
     }
 
     // ── HTTP ──────────────────────────────────────────────────────────────────
@@ -71,20 +76,22 @@ public class ChatController {
     public SessionResponse getSession(
             HttpSession httpSession,
             @RequestParam(defaultValue = "GEMINI") AiProvider provider,
-            @RequestParam(required = false) String sessionUuid) {
+            @RequestParam(required = false) String sessionUuid,
+            @RequestParam(required = false) String modelId) {
         AiSession session = (sessionUuid == null || sessionUuid.isBlank())
-                ? chatService.getOrCreateSession(httpSession.getId(), provider)
+                ? chatService.getOrCreateSession(httpSession.getId(), provider, modelId)
                 : chatService.getSessionForCurrentUser(sessionUuid);
         return new SessionResponse(session.uuid(), session.name(), session.provider(),
-                session.activeAgentTemplateId(), session.messages());
+                session.activeAgentTemplateId(), session.messages(), session.modelId());
     }
 
     @GetMapping("/session/new")
     public SessionResponse createSession(
-            @RequestParam(defaultValue = "GEMINI") AiProvider provider) {
-        AiSession session = chatService.createNewSession(provider);
+            @RequestParam(defaultValue = "GEMINI") AiProvider provider,
+            @RequestParam(required = false) String modelId) {
+        AiSession session = chatService.createNewSession(provider, modelId);
         return new SessionResponse(session.uuid(), session.name(), session.provider(),
-                session.activeAgentTemplateId(), session.messages());
+                session.activeAgentTemplateId(), session.messages(), session.modelId());
     }
 
     @GetMapping("/sessions")
@@ -97,7 +104,8 @@ public class ChatController {
                         session.name(),
                         session.provider(),
                         session.createdAt(),
-                        session.messages() == null ? 0 : session.messages().size()))
+                        session.messages() == null ? 0 : session.messages().size(),
+                        session.modelId()))
                 .toList();
     }
 
@@ -111,8 +119,36 @@ public class ChatController {
                 session.name(),
                 session.provider(),
                 session.createdAt(),
-                session.messages() == null ? 0 : session.messages().size());
+                session.messages() == null ? 0 : session.messages().size(),
+                session.modelId());
             }
+
+    @PutMapping("/session/{sessionUuid}/model")
+    public ResponseEntity<?> updateSessionModel(@PathVariable String sessionUuid,
+                                                @RequestBody ModelSelectionRequest request) {
+        log.debug("ENTER updateSessionModel: [session={}, provider={}, model={}]",
+                sessionUuid, request.provider(), request.modelId());
+        try {
+            AiSession session = chatService.updateSessionModel(sessionUuid,
+                    request.provider(), request.modelId());
+            log.info("Session model updated [session={}, provider={}, model={}]",
+                    sessionUuid, session.provider(), session.modelId());
+            return ResponseEntity.ok(Map.of(
+                    "status", "OK",
+                    "provider", session.provider(),
+                    "modelId", session.modelId() != null ? session.modelId() : ""));
+        } catch (IllegalStateException ex) {
+            log.warn("updateSessionModel denied [session={}, reason={}]", sessionUuid, ex.getMessage());
+            return ResponseEntity.status(403)
+                    .body(Map.of("status", "ERROR", "message", "Access denied"));
+        }
+    }
+
+    @GetMapping("/models")
+    public List<AiModelService.ProviderModelGroup> getModels() {
+        log.debug("ENTER getModels");
+        return modelService.getConfiguredProviders();
+    }
 
     @PostMapping("/session/{sessionUuid}/agent")
     public ResponseEntity<?> switchAgent(@PathVariable String sessionUuid,
@@ -220,14 +256,16 @@ public class ChatController {
     // ── DTOs ──────────────────────────────────────────────────────────────────
 
     record SessionResponse(String sessionUuid, String sessionName, String provider,
-                            String activeAgentTemplateId, List<AiChatMessage> messages) {}
+                            String activeAgentTemplateId, List<AiChatMessage> messages, String modelId) {}
 
     record SessionSummaryResponse(String sessionUuid, String sessionName, String provider,
-                                  long createdAt, int messageCount) {}
+                                  long createdAt, int messageCount, String modelId) {}
 
     record RenameSessionRequest(String name) {}
 
     record ChatRequest(String sessionUuid, String content, String provider, List<String> attachmentUuids) {}
+
+    record ModelSelectionRequest(String provider, String modelId) {}
 
     record AgentTemplateSummary(String uuid, String name) {}
 }

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications — Vork</title>
+    <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body>
+<div class="container py-5" style="max-width: 760px;">
+    <div th:replace="~{fragments/settings-navigation :: backToSettings}"></div>
+    <h2 class="mb-1"><i class="fa-solid fa-bell me-2"></i>Notifications</h2>
+    <p class="text-muted mb-4">Configure notification providers for sending alerts and messages.</p>
+
+    <div id="alert-area" class="mb-3"></div>
+
+    <!-- Configured providers list -->
+    <div id="config-list" class="mb-4"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="text-center text-muted py-5" style="display:none;">
+        <i class="fa-solid fa-bell-slash fa-2x mb-3 d-block"></i>
+        No notification providers configured yet.
+    </div>
+
+    <button class="btn btn-primary" onclick="openAddModal()">
+        <i class="fa-solid fa-plus me-2"></i>Add Provider
+    </button>
+</div>
+
+<!-- ─── Create / Edit Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="providerModal" tabindex="-1" aria-labelledby="providerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="providerModalLabel">Add Notification Provider</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="config-id">
+                <input type="hidden" id="config-provider-key">
+
+                <!-- Step 1: choose provider type (hidden for edit) -->
+                <div id="step-choose">
+                    <div class="mb-3">
+                        <label class="form-label" for="provider-type-select">
+                            Provider Type <span class="text-danger">*</span>
+                        </label>
+                        <select id="provider-type-select" class="form-select" onchange="onProviderTypeChange()">
+                            <option value="">— select a provider —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Step 2: instance name + settings fields -->
+                <div id="step-settings" style="display:none;">
+                    <div class="mb-3">
+                        <label class="form-label" for="config-display-name">
+                            Display Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" id="config-display-name" class="form-control"
+                               placeholder="e.g. Alert Emails">
+                    </div>
+                    <hr class="my-3">
+                    <div id="dynamic-fields"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btn-save" class="btn btn-primary" onclick="saveConfig()" style="display:none;">
+                    <i class="fa-solid fa-save me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let providerModal;
+    let allProviders = [];   // [{providerKey, displayName, settingDefinitions}]
+    let allConfigs   = [];   // [{uuid, providerKey, displayName, settings}]
+    let editingId    = null; // uuid of config being edited, or null for create
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        providerModal = new bootstrap.Modal(document.getElementById('providerModal'));
+        document.getElementById('providerModal').addEventListener('hidden.bs.modal', resetModal);
+        loadAll();
+    });
+
+    async function loadAll() {
+        try {
+            const [pRes, cRes] = await Promise.all([
+                fetch('/api/notifications/providers'),
+                fetch('/api/notifications/configs')
+            ]);
+            allProviders = pRes.ok ? await pRes.json() : [];
+            allConfigs   = cRes.ok ? await cRes.json() : [];
+
+            // Populate provider type dropdown
+            const sel = document.getElementById('provider-type-select');
+            allProviders.forEach(function (p) {
+                const opt = document.createElement('option');
+                opt.value       = p.providerKey;
+                opt.textContent = p.displayName;
+                sel.appendChild(opt);
+            });
+
+            renderConfigs();
+        } catch (e) {
+            showAlert('Failed to load notification data.', 'warning');
+        }
+    }
+
+    // ── Render config list ────────────────────────────────────────────────────
+    function renderConfigs() {
+        const list    = document.getElementById('config-list');
+        const empty   = document.getElementById('empty-state');
+        list.innerHTML = '';
+
+        if (allConfigs.length === 0) {
+            list.style.display  = 'none';
+            empty.style.display = '';
+            return;
+        }
+        empty.style.display = 'none';
+        list.style.display  = '';
+
+        allConfigs.forEach(function (cfg) {
+            const provider = allProviders.find(function (p) { return p.providerKey === cfg.providerKey; });
+            const providerLabel = provider ? provider.displayName : cfg.providerKey;
+
+            const card = document.createElement('div');
+            card.className = 'card mb-3';
+            card.id = 'card-' + cfg.uuid;
+            card.innerHTML =
+                '<div class="card-body d-flex align-items-center justify-content-between gap-3">' +
+                '  <div>' +
+                '    <div class="fw-semibold">' + escapeHtml(cfg.displayName) + '</div>' +
+                '    <div class="text-muted small">' +
+                '      <span class="badge bg-secondary me-1">' + escapeHtml(providerLabel) + '</span>' +
+                buildSettingsPills(cfg, provider) +
+                '    </div>' +
+                '  </div>' +
+                '  <div class="d-flex gap-2 flex-shrink-0">' +
+                '    <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal(\'' + cfg.uuid + '\')" title="Edit">' +
+                '      <i class="fa-solid fa-pen"></i>' +
+                '    </button>' +
+                '    <button class="btn btn-sm btn-outline-danger" onclick="deleteConfig(\'' + cfg.uuid + '\')" title="Delete">' +
+                '      <i class="fa-solid fa-trash"></i>' +
+                '    </button>' +
+                '  </div>' +
+                '</div>';
+            list.appendChild(card);
+        });
+    }
+
+    function buildSettingsPills(cfg, provider) {
+        if (!provider) return '';
+        return provider.settingDefinitions
+            .filter(function (d) { return d.type !== 'password'; })
+            .map(function (d) {
+                const val = cfg.settings[d.key];
+                if (!val) return '';
+                return '<span class="me-2 text-muted">' +
+                    escapeHtml(d.label) + ': <span class="text-body-secondary">' +
+                    escapeHtml(val) + '</span></span>';
+            }).join('');
+    }
+
+    // ── Modal: Add ────────────────────────────────────────────────────────────
+    function openAddModal() {
+        editingId = null;
+        document.getElementById('providerModalLabel').textContent = 'Add Notification Provider';
+        document.getElementById('config-id').value             = '';
+        document.getElementById('config-provider-key').value   = '';
+        document.getElementById('config-display-name').value   = '';
+        document.getElementById('provider-type-select').value  = '';
+        document.getElementById('step-choose').style.display   = '';
+        document.getElementById('step-settings').style.display = 'none';
+        document.getElementById('btn-save').style.display      = 'none';
+        document.getElementById('dynamic-fields').innerHTML    = '';
+        providerModal.show();
+    }
+
+    function onProviderTypeChange() {
+        const key = document.getElementById('provider-type-select').value;
+        if (!key) {
+            document.getElementById('step-settings').style.display = 'none';
+            document.getElementById('btn-save').style.display      = 'none';
+            return;
+        }
+        const provider = allProviders.find(function (p) { return p.providerKey === key; });
+        if (!provider) return;
+
+        document.getElementById('config-display-name').value   = provider.displayName;
+        renderSettingsFields(provider.settingDefinitions, {});
+        document.getElementById('step-settings').style.display = '';
+        document.getElementById('btn-save').style.display      = '';
+    }
+
+    // ── Modal: Edit ───────────────────────────────────────────────────────────
+    function openEditModal(id) {
+        const cfg = allConfigs.find(function (c) { return c.uuid === id; });
+        if (!cfg) { showAlert('Config not found — reload the page.', 'warning'); return; }
+        const provider = allProviders.find(function (p) { return p.providerKey === cfg.providerKey; });
+
+        editingId = id;
+        document.getElementById('providerModalLabel').textContent   = 'Edit: ' + cfg.displayName;
+        document.getElementById('config-id').value                  = cfg.uuid;
+        document.getElementById('config-provider-key').value        = cfg.providerKey;
+        document.getElementById('config-display-name').value        = cfg.displayName;
+
+        // Edit: hide provider-type chooser, show settings directly
+        document.getElementById('step-choose').style.display        = 'none';
+        document.getElementById('step-settings').style.display      = '';
+        document.getElementById('btn-save').style.display           = '';
+
+        renderSettingsFields(provider ? provider.settingDefinitions : [], cfg.settings);
+        providerModal.show();
+    }
+
+    // ── Dynamic fields ────────────────────────────────────────────────────────
+    function renderSettingsFields(defs, currentValues) {
+        const container = document.getElementById('dynamic-fields');
+        container.innerHTML = '';
+        defs.forEach(function (d) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mb-3';
+            const label = document.createElement('label');
+            label.className   = 'form-label';
+            label.htmlFor     = 'field-' + d.key;
+            label.textContent = d.label + (d.required ? ' *' : '');
+            if (d.required) {
+                const star = document.createElement('span');
+                star.className   = 'text-danger ms-1';
+                star.textContent = '';
+                label.appendChild(star);
+            }
+
+            const input = document.createElement('input');
+            input.type        = d.type === 'email' ? 'email' : (d.type === 'password' ? 'password' : 'text');
+            input.id          = 'field-' + d.key;
+            input.dataset.key = d.key;
+            input.className   = 'form-control';
+            input.placeholder = d.placeholder || '';
+            input.value       = currentValues[d.key] || '';
+
+            const feedback = document.createElement('div');
+            feedback.id        = 'err-' + d.key;
+            feedback.className = 'invalid-feedback';
+
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+            wrapper.appendChild(feedback);
+            container.appendChild(wrapper);
+        });
+    }
+
+    // ── Save ──────────────────────────────────────────────────────────────────
+    async function saveConfig() {
+        const id          = document.getElementById('config-id').value.trim();
+        const displayName = document.getElementById('config-display-name').value.trim();
+        const providerKey = id
+            ? document.getElementById('config-provider-key').value
+            : document.getElementById('provider-type-select').value;
+
+        if (!displayName) {
+            showAlert('Display Name is required.', 'warning');
+            return;
+        }
+        if (!providerKey) {
+            showAlert('Please select a provider type.', 'warning');
+            return;
+        }
+
+        // Collect dynamic fields
+        const settings = {};
+        document.querySelectorAll('#dynamic-fields input[data-key]').forEach(function (inp) {
+            settings[inp.dataset.key] = inp.value;
+        });
+
+        // Clear prior field errors
+        document.querySelectorAll('#dynamic-fields .form-control').forEach(function (el) {
+            el.classList.remove('is-invalid');
+        });
+
+        const btn = document.getElementById('btn-save');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+
+        try {
+            const url    = id ? '/api/notifications/configs/' + id : '/api/notifications/configs';
+            const method = id ? 'PUT' : 'POST';
+            const res    = await fetch(url, {
+                method:  method,
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ providerKey: providerKey, displayName: displayName, settings: settings })
+            });
+            const data = await res.json();
+
+            if (data.fieldErrors) {
+                // Annotate invalid fields
+                Object.entries(data.fieldErrors).forEach(function ([key, msg]) {
+                    const input = document.getElementById('field-' + key);
+                    const err   = document.getElementById('err-' + key);
+                    if (input) input.classList.add('is-invalid');
+                    if (err)   err.textContent = msg;
+                });
+                return;
+            }
+            if (data.error) { showAlert(data.error, 'danger'); return; }
+
+            // Update local cache and re-render
+            if (id) {
+                allConfigs = allConfigs.map(function (c) { return c.uuid === id ? data : c; });
+            } else {
+                allConfigs.push(data);
+            }
+            renderConfigs();
+            providerModal.hide();
+            showAlert(id ? 'Provider updated.' : 'Provider added.', 'success');
+        } catch (e) {
+            showAlert('Network error saving provider.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i>Save';
+        }
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+    async function deleteConfig(id) {
+        if (!confirm('Remove this notification provider? This cannot be undone.')) return;
+        try {
+            const res  = await fetch('/api/notifications/configs/' + id, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.error) { showAlert(data.error, 'danger'); return; }
+            allConfigs = allConfigs.filter(function (c) { return c.uuid !== id; });
+            const card = document.getElementById('card-' + id);
+            if (card) card.remove();
+            renderConfigs();
+            showAlert('Provider removed.', 'success');
+        } catch (e) {
+            showAlert('Network error deleting provider.', 'danger');
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function resetModal() {
+        editingId = null;
+        document.getElementById('config-id').value             = '';
+        document.getElementById('config-provider-key').value   = '';
+        document.getElementById('config-display-name').value   = '';
+        document.getElementById('provider-type-select').value  = '';
+        document.getElementById('dynamic-fields').innerHTML    = '';
+        document.getElementById('step-choose').style.display   = '';
+        document.getElementById('step-settings').style.display = 'none';
+        document.getElementById('btn-save').style.display      = 'none';
+        document.querySelectorAll('#dynamic-fields .form-control').forEach(function (el) {
+            el.classList.remove('is-invalid');
+        });
+    }
+
+    function showAlert(msg, type) {
+        const area = document.getElementById('alert-area');
+        area.innerHTML =
+            '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
+            escapeHtml(msg) +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+            '</div>';
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+</script>
+</body>
+</html>

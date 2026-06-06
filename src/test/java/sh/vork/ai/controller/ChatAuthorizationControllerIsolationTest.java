@@ -64,7 +64,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         AuthorizationRuleEngine rules = new AuthorizationRuleEngine(List.of(), null);
         RecordingAiService aiService = new RecordingAiService("web-final");
@@ -119,7 +119,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         AuthorizationRuleEngine rules = new AuthorizationRuleEngine(List.of(), null);
         RecordingAiService aiService = new RecordingAiService("bg-final");
@@ -172,7 +172,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         AuthorizationRuleEngine rules = new AuthorizationRuleEngine(List.of(), null);
         RecordingAiService aiService = new RecordingAiService("bg-final");
@@ -232,7 +232,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         ChatAuthorizationController controller = new ChatAuthorizationController(
                 sessionRepo,
@@ -283,7 +283,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 env,
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         ToolCallback contextTool = FunctionToolCallback.builder("compileJavaType",
                 (DummyCompileToolRequest req) -> {
@@ -349,7 +349,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         ToolCallback terminalTool = FunctionToolCallback.builder("executeTerminalCommand",
                 (ExecuteTerminalCommandRequest req) -> "ls -lls -l\ntotal 1\nfile.txt\n")
@@ -412,7 +412,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         ToolCallback terminalTool = FunctionToolCallback.builder("executeTerminalCommand",
                 (ExecuteTerminalCommandRequest req) -> "{\"status\":\"COMPLETED\",\"command\":\"uname -a\",\"terminalId\":\"term-123\",\"outputFileUuid\":\"file-123\",\"output\":\"Darwin test-host\"}")
@@ -473,7 +473,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         ToolCallback terminalTool = FunctionToolCallback.builder("executeTerminalCommand",
                 (ExecuteTerminalCommandRequest req) -> "{\"status\":\"COMPLETED\",\"command\":\"whoami\",\"terminalId\":\"term-fail\",\"output\":\"alice\"}")
@@ -533,7 +533,7 @@ class ChatAuthorizationControllerIsolationTest {
                 0,
                 List.of(prompt),
                 AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.AWAITING_INPUT, null));
+                AiSessionStatus.AWAITING_INPUT, null, null));
 
         InteractionFormSchema credentialSchema = new InteractionFormSchema(
                 "AUTHORIZE_TOOL",
@@ -626,7 +626,7 @@ class ChatAuthorizationControllerIsolationTest {
         private String lastNewUserMessage;
 
         private RecordingAiService(String nextOutput) {
-            super(Map.of(), null, null, null, Map.of());
+            super(Map.of(), null, null, null, null, Map.of());
             this.nextOutput = nextOutput;
         }
 
@@ -655,7 +655,7 @@ class ChatAuthorizationControllerIsolationTest {
 
         private static final class FailingAiService extends AiOrchestrationService {
                 private FailingAiService() {
-                        super(Map.of(), null, null, null, Map.of());
+                        super(Map.of(), null, null, null, null, Map.of());
                 }
 
                 @Override

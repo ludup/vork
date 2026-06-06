@@ -13,11 +13,18 @@ import sh.vork.ai.entity.AiSession;
 import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
 import com.jadaptive.orm.DatabaseRepository;
+import sh.vork.scheduling.domain.InvocationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;
 
 /**
  * Runnable wrapper for executing one scheduled AI job invocation.
+ *
+ * <p>At the start of each execution the job is reloaded from the database so
+ * that its current status can be checked.  If a previous run is still ACTIVE
+ * or AWAITING_INPUT the execution is skipped — this prevents overlapping runs
+ * for REPEAT jobs.  The job is immediately marked ACTIVE before the AI call so
+ * that any concurrent fire also skips cleanly.
  */
 public class AiJobRunner implements Runnable {
 
@@ -40,92 +47,138 @@ public class AiJobRunner implements Runnable {
 
     @Override
     public void run() {
+        // ── Guard: reload current state and skip if already in-flight ──────────
+        ScheduledJob current = jobRepository.get(job.id());
+        if (current == null) {
+            log.warn("Job not found at execution time, skipping [id={}]", job.id());
+            return;
+        }
+        if (current.status() == ScheduledJobStatus.ACTIVE
+                || current.status() == ScheduledJobStatus.AWAITING_INPUT) {
+            log.warn("Skipping execution: previous run still in progress [id={}, status={}]",
+                    job.id(), current.status());
+            return;
+        }
+        if (current.status() == ScheduledJobStatus.PAUSED) {
+            log.info("Skipping execution: job is paused [id={}]", job.id());
+            return;
+        }
+
+        // ── Mark ACTIVE before spawning so concurrent fires are blocked ────────
+        save(ScheduledJobStatus.ACTIVE, current.lastExecutionTime(), current.nextExecutionTime());
+
         String trackingSessionUuid = job.id() + "-run-" + UUID.randomUUID();
         long now = System.currentTimeMillis();
         try {
+            String effectiveProvider = (job.provider() != null && !job.provider().isBlank())
+                    ? job.provider()
+                    : AiProvider.BACKGROUND_SCHEDULER.name();
+
             AiChatMessage seedMessage = new AiChatMessage(
-                UUID.randomUUID().toString(),
-                "USER",
-                job.aiPrompt(),
-                now,
-                null);
+                    UUID.randomUUID().toString(),
+                    "USER",
+                    job.aiPrompt(),
+                    now,
+                    null);
 
             AiSession trackingSession = new AiSession(
-                trackingSessionUuid,
-                AiProvider.BACKGROUND_SCHEDULER.name(),
-                SessionOriginMode.BACKGROUND,
-                job.username(),
-                "Untitled",
-                now,
-                0,
-                List.of(seedMessage),
-                AiSession.defaultEnvironmentVariables(),
-                AiSessionStatus.RUNNING,
-                null);
+                    trackingSessionUuid,
+                    effectiveProvider,
+                    SessionOriginMode.BACKGROUND,
+                    job.userId(),
+                    "Job: " + job.name(),
+                    now,
+                    0,
+                    List.of(seedMessage),
+                    AiSession.defaultEnvironmentVariables(),
+                    AiSessionStatus.RUNNING,
+                    job.agentTemplateId(),
+                    job.modelId());
             sessionRepository.save(trackingSession);
 
             SecurityContextHolder.getContext()
-                    .setAuthentication(new SystemBackgroundAuthentication(job.username()));
+                    .setAuthentication(new SystemBackgroundAuthentication(job.userId()));
 
-            log.info("Executing scheduled AI job [id={}, name={}, user={}, sourceSession={}, trackingSession={}]",
-                job.id(), job.name(), job.username(), job.sessionUuid(), trackingSessionUuid);
+            log.info("Executing scheduled AI job [id={}, name={}, user={}, type={}, tracking={}]",
+                    job.id(), job.name(), job.userId(), job.invocationType(), trackingSessionUuid);
 
-            executeBackgroundTurn(trackingSessionUuid);
+            backgroundOrchestrationEngine.executeBackgroundTurn(trackingSessionUuid, job.aiPrompt());
 
             AiSession finalSession = sessionRepository.get(trackingSessionUuid);
-                log.info("Scheduled AI job run finished [id={}, trackingSession={}, repeatDuration={}, finalSessionStatus={}]",
-                    job.id(),
-                    trackingSessionUuid,
-                    job.repeatDuration(),
+            log.info("Scheduled AI job run finished [id={}, type={}, tracking={}, sessionStatus={}]",
+                    job.id(), job.invocationType(), trackingSessionUuid,
                     finalSession == null ? "<missing>" : finalSession.status());
 
-            if (job.repeatDuration() == 0
-                    && finalSession != null
-                    && finalSession.status() == AiSessionStatus.COMPLETED) {
-                jobRepository.save(new ScheduledJob(
-                        job.id(),
-                        job.name(),
-                        job.aiPrompt(),
-                        job.sessionUuid(),
-                        job.username(),
-                        job.startTime(),
-                        job.repeatDuration(),
-                        job.durationType(),
-                        ScheduledJobStatus.COMPLETED));
-                log.info("Scheduled AI job marked completed [id={}]", job.id());
-                    } else if (job.repeatDuration() == 0
-                        && finalSession != null
-                        && finalSession.status() == AiSessionStatus.AWAITING_INPUT) {
-                    jobRepository.save(new ScheduledJob(
-                        job.id(),
-                        job.name(),
-                        job.aiPrompt(),
-                        job.sessionUuid(),
-                        job.username(),
-                        job.startTime(),
-                        job.repeatDuration(),
-                        job.durationType(),
-                        ScheduledJobStatus.PAUSED));
-                    log.info("Scheduled AI job paused awaiting authorization [id={}, trackingSession={}]",
-                        job.id(), trackingSessionUuid);
-            } else if (job.repeatDuration() > 0) {
-                log.info("Scheduled AI job remains ACTIVE because it is recurring [id={}, repeatDuration={}, unit={}]",
-                        job.id(), job.repeatDuration(), job.durationType());
-            } else if (finalSession == null) {
-                log.warn("Scheduled AI job remains ACTIVE because tracking session is missing [id={}, trackingSession={}]",
-                        job.id(), trackingSessionUuid);
-            } else {
-                log.info("Scheduled AI job remains ACTIVE because final tracking session is not COMPLETED [id={}, trackingSession={}, finalStatus={}]",
-                        job.id(), trackingSessionUuid, finalSession.status());
-            }
+            updateJobAfterRun(now, finalSession, trackingSessionUuid);
+
         } catch (Exception ex) {
             log.error("Scheduled AI job failed [id={}]: {}", job.id(), ex.getMessage(), ex);
+            // Reset to WAITING so the job can retry on next scheduled interval
+            save(ScheduledJobStatus.WAITING, current.lastExecutionTime(), current.nextExecutionTime());
         } finally {
             SecurityContextHolder.clearContext();
         }
     }
 
-    public void executeBackgroundTurn(String sessionUuid) {
-        backgroundOrchestrationEngine.executeBackgroundTurn(sessionUuid, job.aiPrompt());
+    private void updateJobAfterRun(long executionTime, AiSession finalSession, String trackingSessionUuid) {
+        InvocationType type = job.invocationType() != null ? job.invocationType() : InvocationType.ONE_TIME;
+
+        // Compute the next scheduled execution time for repeating jobs
+        long nextExec;
+        if (type == InvocationType.REPEAT && job.repeatDuration() > 0) {
+            nextExec = executionTime
+                    + AiSchedulerService.toDuration(job.repeatDuration(), job.durationType()).toMillis();
+        } else {
+            nextExec = 0L;
+        }
+
+        boolean awaitingInput = finalSession != null
+                && finalSession.status() == AiSessionStatus.AWAITING_INPUT;
+
+        switch (type) {
+            case ONE_TIME -> {
+                if (awaitingInput) {
+                    save(ScheduledJobStatus.AWAITING_INPUT, executionTime, 0L);
+                    log.info("ONE_TIME job awaiting authorization [id={}, tracking={}]",
+                            job.id(), trackingSessionUuid);
+                } else {
+                    save(ScheduledJobStatus.WAITING, executionTime, 0L);
+                    log.info("ONE_TIME job finished [id={}]", job.id());
+                }
+            }
+            case REPEAT -> {
+                if (awaitingInput) {
+                    save(ScheduledJobStatus.AWAITING_INPUT, executionTime, nextExec);
+                    log.info("REPEAT job awaiting authorization [id={}, tracking={}]",
+                            job.id(), trackingSessionUuid);
+                } else {
+                    save(ScheduledJobStatus.WAITING, executionTime, nextExec);
+                    log.info("REPEAT job execution recorded [id={}, nextRun={}]", job.id(), nextExec);
+                }
+            }
+            case MANUAL -> {
+                save(ScheduledJobStatus.WAITING, executionTime, 0L);
+                log.info("MANUAL job execution recorded [id={}]", job.id());
+            }
+        }
+    }
+
+    private void save(ScheduledJobStatus newStatus, long lastExecutionTime, long nextExecutionTime) {
+        jobRepository.save(new ScheduledJob(
+                job.id(),
+                job.name(),
+                job.aiPrompt(),
+                job.sessionUuid(),
+                job.userId(),
+                job.invocationType(),
+                job.startTime(),
+                job.repeatDuration(),
+                job.durationType(),
+                lastExecutionTime,
+                nextExecutionTime,
+                job.agentTemplateId(),
+                job.provider(),
+                job.modelId(),
+                newStatus));
     }
 }

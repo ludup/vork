@@ -33,7 +33,7 @@ class AiOrchestrationServicePromptHydrationTest {
         SessionEnvironmentService envService = mock(SessionEnvironmentService.class);
         @SuppressWarnings("unchecked")
         AiOrchestrationService service = new AiOrchestrationService(
-                Map.of(), envService, mock(DatabaseRepository.class), mock(DatabaseRepository.class), Map.of());
+                Map.of(), null, envService, mock(DatabaseRepository.class), mock(DatabaseRepository.class), Map.of());
 
         String prompt = invokeComposeSystemPrompt(service);
 
@@ -50,7 +50,7 @@ class AiOrchestrationServicePromptHydrationTest {
 
         @SuppressWarnings("unchecked")
         AiOrchestrationService service = new AiOrchestrationService(
-                Map.of(AiProvider.GEMINI, mock(ChatClient.class)), envService,
+                Map.of(AiProvider.GEMINI, mock(ChatClient.class)), null, envService,
                 sessionRepo, mock(DatabaseRepository.class), Map.of());
         ToolExecutionContext.bindSessionUuid("session-1");
 
@@ -74,7 +74,7 @@ class AiOrchestrationServicePromptHydrationTest {
 
         @SuppressWarnings("unchecked")
         AiOrchestrationService service = new AiOrchestrationService(
-                Map.of(AiProvider.GEMINI, mock(ChatClient.class)), envService,
+                Map.of(AiProvider.GEMINI, mock(ChatClient.class)), null, envService,
                 sessionRepo, mock(DatabaseRepository.class), Map.of());
         ToolExecutionContext.bindSessionUuid("session-2");
 

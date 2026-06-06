@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup — Vork</title>
+    <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body { background: var(--bs-body-bg); }
+        .setup-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .setup-card { width: 100%; max-width: 500px; }
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        .step-dot {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem; font-weight: 600;
+            background: var(--bs-secondary-bg);
+            color: var(--bs-secondary-color);
+            border: 2px solid var(--bs-border-color);
+            transition: background 0.25s, border-color 0.25s, color 0.25s;
+            flex-shrink: 0;
+        }
+        .step-dot.active  { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+        .step-dot.done    { background: #198754; color: #fff; border-color: #198754; }
+        .step-line        { flex: 1; height: 2px; background: var(--bs-border-color); max-width: 100px; }
+        .step-panel       { display: none; }
+        .step-panel.active { display: block; }
+        .provider-btn {
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            border: 1px solid var(--bs-border-color);
+        }
+        .provider-btn:hover  { border-color: var(--bs-primary) !important; }
+        .provider-btn.selected {
+            border-color: #0d6efd !important;
+            background: rgba(13, 110, 253, 0.12) !important;
+        }
+        .feature-list li { padding: 0.3rem 0; }
+    </style>
+</head>
+<body>
+<div class="setup-wrapper">
+    <div class="setup-card">
+
+        <!-- Branding -->
+        <div class="text-center mb-4">
+            <img src="/images/Vork-Faviconx128.png" alt="Vork" width="60" height="60" class="mb-3">
+            <h4 class="fw-bold mb-0">Welcome to Vork</h4>
+            <p class="text-muted small mt-1 mb-0">Let&rsquo;s get you up and running</p>
+        </div>
+
+        <!-- Step indicator -->
+        <div class="step-indicator gap-0">
+            <div class="step-dot active" id="dot-1">1</div>
+            <div class="step-line mx-2"></div>
+            <div class="step-dot" id="dot-2">2</div>
+            <div class="step-line mx-2"></div>
+            <div class="step-dot" id="dot-3">3</div>
+            <div class="step-line mx-2"></div>
+            <div class="step-dot" id="dot-4">4</div>
+            <div class="step-line mx-2"></div>
+            <div class="step-dot" id="dot-5"><i class="fa-solid fa-check fa-xs"></i></div>
+        </div>
+
+        <div id="alert-area" class="mb-3"></div>
+
+        <!-- ─── Step 1: Account ─────────────────────────────────────────── -->
+        <div id="step-account" class="step-panel active">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-1">
+                        <i class="fa-solid fa-user-shield me-2 text-primary"></i>Create Admin Account
+                    </h5>
+                    <p class="text-muted small mb-4">This will be your administrator login for Vork.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="username">Username</label>
+                        <input type="text" id="username" class="form-control" placeholder="admin"
+                               autocomplete="username" onkeydown="if(event.key==='Enter')createAccount()">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="password">Password</label>
+                        <input type="password" id="password" class="form-control" placeholder="Minimum 8 characters"
+                               autocomplete="new-password" onkeydown="if(event.key==='Enter')createAccount()">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label" for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" class="form-control"
+                               autocomplete="new-password" onkeydown="if(event.key==='Enter')createAccount()">
+                    </div>
+                    <button id="btn-create-account" class="btn btn-primary w-100" onclick="createAccount()">
+                        <i class="fa-solid fa-arrow-right me-2"></i>Create Account
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Step 2: AI Provider ─────────────────────────────────────── -->
+        <div id="step-ai" class="step-panel">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-1">
+                        <i class="fa-solid fa-robot me-2 text-primary"></i>Configure AI Provider
+                    </h5>
+                    <p class="text-muted small mb-4">
+                        Connect an AI provider to start chatting. This is required.
+                        You can add more providers later in <strong>Settings → AI Models</strong>.
+                    </p>
+
+                    <!-- Provider selection -->
+                    <label class="form-label">Select Provider</label>
+                    <div class="d-flex gap-2 mb-3">
+                        <div class="card provider-btn flex-fill text-center p-2 rounded" onclick="selectProvider('GEMINI')" id="btn-GEMINI">
+                            <div class="fw-semibold small">Gemini</div>
+                            <div class="text-muted" style="font-size:0.7rem">Google</div>
+                        </div>
+                        <div class="card provider-btn flex-fill text-center p-2 rounded" onclick="selectProvider('OPENAI')" id="btn-OPENAI">
+                            <div class="fw-semibold small">ChatGPT</div>
+                            <div class="text-muted" style="font-size:0.7rem">OpenAI</div>
+                        </div>
+                        <div class="card provider-btn flex-fill text-center p-2 rounded" onclick="selectProvider('OLLAMA')" id="btn-OLLAMA">
+                            <div class="fw-semibold small">Ollama</div>
+                            <div class="text-muted" style="font-size:0.7rem">Local</div>
+                        </div>
+                    </div>
+
+                    <!-- Gemini config (pre-configured via application.yml) -->
+                    <div id="config-GEMINI" class="provider-config d-none">
+                        <div class="alert alert-info small py-2 mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            Gemini is pre-configured in <code>application.yml</code>.
+                            Click <strong>Test Connection</strong> to verify.
+                        </div>
+                    </div>
+
+                    <!-- OpenAI config -->
+                    <div id="config-OPENAI" class="provider-config d-none">
+                        <div class="mb-3">
+                            <label class="form-label" for="apiKey-OPENAI">OpenAI API Key</label>
+                            <input type="password" id="apiKey-OPENAI" class="form-control"
+                                   placeholder="sk-…" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <!-- Ollama config -->
+                    <div id="config-OLLAMA" class="provider-config d-none">
+                        <div class="mb-3">
+                            <label class="form-label" for="baseUrl-OLLAMA">Ollama Base URL</label>
+                            <input type="url" id="baseUrl-OLLAMA" class="form-control"
+                                   value="http://localhost:11434">
+                        </div>
+                    </div>
+
+                    <!-- Test + model selection (shown after provider selected) -->
+                    <div id="provider-actions" class="d-none">
+                        <button id="btn-test" class="btn btn-outline-secondary w-100 mb-3"
+                                onclick="testProvider()">
+                            <i class="fa-solid fa-plug me-2"></i>Test Connection &amp; Discover Models
+                        </button>
+
+                        <div id="model-select-area" class="d-none">
+                            <label class="form-label" for="default-model">Default Model</label>
+                            <select id="default-model" class="form-select mb-3">
+                                <option value="">— select a model —</option>
+                            </select>
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" id="set-global" checked>
+                                <label class="form-check-label small" for="set-global">
+                                    Set as global default provider &amp; model
+                                </label>
+                            </div>
+                            <button id="btn-save-provider" class="btn btn-primary w-100"
+                                    onclick="saveProvider()">
+                                <i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Step 3: Notification Provider ─────────────────────────────── -->
+        <div id="step-notif-provider" class="step-panel">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-1">
+                        <i class="fa-solid fa-paper-plane me-2 text-primary"></i>Notification Provider
+                    </h5>
+                    <p class="text-muted small mb-3">
+                        Set up a provider to deliver notifications. You can add more later in
+                        <strong>Settings &rarr; Notifications</strong>.
+                    </p>
+                    <div id="np-loading" class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm text-secondary"></span>
+                    </div>
+                    <div id="np-no-providers" class="alert alert-secondary small py-2 d-none">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        No notification providers are available in this build.
+                    </div>
+                    <div id="np-provider-cards" class="d-flex flex-wrap gap-2 mb-3 d-none"></div>
+                    <div id="np-form-wrap" class="d-none">
+                        <div class="mb-3">
+                            <label class="form-label" for="np-display-name">
+                                Name <span class="text-muted small">(optional label)</span>
+                            </label>
+                            <input type="text" id="np-display-name" class="form-control"
+                                   placeholder="e.g. My SMTP Server">
+                        </div>
+                        <div id="np-fields"></div>
+                        <div id="np-field-errors" class="mb-2"></div>
+                        <button id="btn-save-notif-provider" class="btn btn-primary w-100"
+                                onclick="saveNotifProvider()">
+                            <i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue
+                        </button>
+                    </div>
+                    <button class="btn btn-outline-secondary w-100 mt-2" onclick="skipNotifProvider()">
+                        Skip
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Step 4: Notification Addresses ────────────────────────── -->
+        <div id="step-notifications" class="step-panel">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-1">
+                        <i class="fa-solid fa-bell me-2 text-primary"></i>Notification Addresses
+                    </h5>
+                    <p class="text-muted small mb-3">
+                        Add a contact address for notifications. More can be added later via
+                        <strong>My Notifications</strong>.
+                    </p>
+
+                    <!-- Loading -->
+                    <div id="na-loading" class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm text-secondary"></span>
+                    </div>
+
+                    <!-- Provider picker (shown when multiple providers configured) -->
+                    <div id="na-provider-pick" class="d-none">
+                        <p class="text-muted small mb-2">Choose a provider to set up an address for:</p>
+                        <div id="na-provider-cards" class="d-flex flex-wrap gap-2 mb-3"></div>
+                    </div>
+
+                    <!-- Email / phone address form -->
+                    <div id="na-address-form" class="d-none">
+                        <div id="na-provider-badge" class="mb-2"></div>
+                        <div class="mb-3">
+                            <label class="form-label" for="na-address" id="na-address-label">Address <span class="text-danger">*</span></label>
+                            <input type="text" id="na-address" class="form-control">
+                            <div id="na-address-hint" class="form-text text-muted"></div>
+                            <div id="na-address-error" class="invalid-feedback"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="na-label">Label <span class="text-muted small">(optional)</span></label>
+                            <input type="text" id="na-label" class="form-control" placeholder="e.g. My email">
+                        </div>
+                        <button id="btn-save-na" class="btn btn-primary w-100" onclick="saveNotifAddress()">
+                            <i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue
+                        </button>
+                    </div>
+
+                    <!-- Telegram QR flow -->
+                    <div id="na-telegram-form" class="d-none">
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:0.5rem 0;">
+                            <div id="na-tg-loading" class="text-center">
+                                <span class="spinner-border spinner-border-sm text-primary me-2"></span>
+                                <span class="small text-muted">Fetching bot info&hellip;</span>
+                            </div>
+                            <canvas id="na-tg-canvas" class="d-none" style="border-radius:0.5rem;"></canvas>
+                            <div id="na-tg-link-wrap" class="d-none text-center">
+                                <p class="small text-muted mb-1">
+                                    Scan with Telegram &mdash; or
+                                    <a id="na-tg-deep-link" href="#" target="_blank" rel="noopener">tap this link</a>
+                                    on your phone.
+                                </p>
+                            </div>
+                            <div id="na-tg-status" class="small text-center"></div>
+                        </div>
+                    </div>
+
+                    <!-- Back (only shown when multiple providers and one is selected) -->
+                    <div id="na-back-wrap" class="d-none mt-2">
+                        <button class="btn btn-link btn-sm p-0 text-muted" onclick="naGoBack()">
+                            <i class="fa-solid fa-arrow-left me-1"></i>Choose a different provider
+                        </button>
+                    </div>
+
+                    <button class="btn btn-outline-secondary w-100 mt-3" onclick="skipNotifications()">
+                        Skip
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Step 5: Welcome ────────────────────────────────────── -->
+        <div id="step-welcome" class="step-panel">
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="fa-solid fa-circle-check fa-3x text-success mb-3 d-block"></i>
+                        <h5 class="fw-bold mb-1">You&rsquo;re all set!</h5>
+                        <p class="text-muted small mb-0">Vork is ready to use. Here&rsquo;s what you can do:</p>
+                    </div>
+
+                    <!-- TODO: Update this feature list whenever new capabilities are added to Vork -->
+                    <ul class="list-unstyled feature-list mb-4 small">
+                        <li><i class="fa-solid fa-comments text-primary me-2 fa-fw"></i>
+                            <strong>Multi-provider AI chat</strong> — Gemini, OpenAI, and Ollama</li>
+                        <li><i class="fa-solid fa-gears text-primary me-2 fa-fw"></i>
+                            <strong>Background task execution</strong> — AI agents running autonomously</li>
+                        <li><i class="fa-solid fa-robot text-primary me-2 fa-fw"></i>
+                            <strong>Customisable agent templates</strong> — Save &amp; reuse system prompts with scoped tools</li>
+                        <li><i class="fa-solid fa-terminal text-primary me-2 fa-fw"></i>
+                            <strong>SSH terminal integration</strong> — AI-assisted remote shell access</li>
+                        <li><i class="fa-solid fa-file-arrow-up text-primary me-2 fa-fw"></i>
+                            <strong>File upload &amp; analysis</strong> — Attach files to any conversation</li>
+                        <li><i class="fa-solid fa-shield-halved text-primary me-2 fa-fw"></i>
+                            <strong>Tool authorisation</strong> — Fine-grained approval workflow for sensitive actions</li>
+                        <li><i class="fa-solid fa-clock-rotate-left text-primary me-2 fa-fw"></i>
+                            <strong>Persistent session history</strong> — All conversations saved to MongoDB</li>
+                        <li><i class="fa-solid fa-code text-primary me-2 fa-fw"></i>
+                            <strong>Type generation</strong> — Auto-generate Java/TypeScript types from AI</li>
+                        <li><i class="fa-solid fa-bell text-primary me-2 fa-fw"></i>
+                            <strong>Notification delivery</strong> — Email, SMS, and Telegram alerts via configurable providers</li>
+                        <li><i class="fa-solid fa-sliders text-primary me-2 fa-fw"></i>
+                            <strong>AI model discovery</strong> — Dynamic model lists fetched from provider APIs</li>
+                    </ul>
+
+                    <a href="/index.html" class="btn btn-success w-100">
+                        <i class="fa-solid fa-rocket me-2"></i>Start Chatting
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /setup-card -->
+</div><!-- /setup-wrapper -->
+
+<script>
+    let selectedProvider = null;
+
+    function showAlert(msg, type) {
+        document.getElementById('alert-area').innerHTML =
+            `<div class="alert alert-${type} alert-dismissible fade show py-2 small" role="alert">
+                ${msg}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+             </div>`;
+    }
+
+    function clearAlert() {
+        document.getElementById('alert-area').innerHTML = '';
+    }
+
+    function setStep(n) {
+        ['step-account', 'step-ai', 'step-notif-provider', 'step-notifications', 'step-welcome'].forEach(function(id, i) {
+            document.getElementById(id).classList.toggle('active', i + 1 === n);
+        });
+        for (let i = 1; i <= 5; i++) {
+            const dot = document.getElementById('dot-' + i);
+            dot.classList.remove('active', 'done');
+            if (i < n)        dot.classList.add('done');
+            else if (i === n) dot.classList.add('active');
+        }
+        if (n === 3) loadNotifProviderTypes();
+        if (n === 4) loadNotifProviders();
+        clearAlert();
+    }
+
+    function selectProvider(provider) {
+        selectedProvider = provider;
+        document.querySelectorAll('.provider-btn').forEach(function(b) { b.classList.remove('selected'); });
+        document.getElementById('btn-' + provider).classList.add('selected');
+        document.querySelectorAll('.provider-config').forEach(function(d) { d.classList.add('d-none'); });
+        document.getElementById('config-' + provider).classList.remove('d-none');
+        document.getElementById('provider-actions').classList.remove('d-none');
+        document.getElementById('model-select-area').classList.add('d-none');
+        clearAlert();
+    }
+
+    // ── Notification addresses step (step 4) ──────────────────────────────────
+
+    let notifProviders    = [];
+    let selectedNotifAddr = null;
+    let naRegistrationId  = null;
+    let naPollTimer       = null;
+
+    async function loadNotifProviders() {
+        selectedNotifAddr = null;
+        stopNaPoll();
+        document.getElementById('na-loading').style.display = '';
+        document.getElementById('na-provider-pick').classList.add('d-none');
+        document.getElementById('na-address-form').classList.add('d-none');
+        document.getElementById('na-telegram-form').classList.add('d-none');
+        document.getElementById('na-back-wrap').classList.add('d-none');
+        try {
+            const res = await fetch('/api/user/notification-media/providers');
+            notifProviders = res.ok ? await res.json() : [];
+        } catch (e) {
+            notifProviders = [];
+        }
+        document.getElementById('na-loading').style.display = 'none';
+        if (notifProviders.length === 0) {
+            setStep(5);
+        } else if (notifProviders.length === 1) {
+            showNotifAddressSetup(notifProviders[0]);
+        } else {
+            renderNaProviderPicker();
+        }
+    }
+
+    function renderNaProviderPicker() {
+        const cardsEl = document.getElementById('na-provider-cards');
+        cardsEl.innerHTML = '';
+        notifProviders.forEach(function (p) {
+            const div = document.createElement('div');
+            div.className = 'card provider-btn text-center p-2 rounded';
+            div.style.minWidth = '90px';
+            div.innerHTML = '<div>' + notifProviderIcon(p.providerKey) + '</div>'
+                          + '<div class="fw-semibold small mt-1">' + escapeHtml(p.configDisplayName) + '</div>';
+            div.onclick = function () { showNotifAddressSetup(p); };
+            cardsEl.appendChild(div);
+        });
+        document.getElementById('na-provider-pick').classList.remove('d-none');
+    }
+
+    function showNotifAddressSetup(pv) {
+        selectedNotifAddr = pv;
+        document.getElementById('na-provider-pick').classList.add('d-none');
+        if (notifProviders.length > 1) {
+            document.getElementById('na-back-wrap').classList.remove('d-none');
+        }
+        if (pv.mediaType === 'TELEGRAM') {
+            document.getElementById('na-telegram-form').classList.remove('d-none');
+            startNaTelegramRegistration(pv.configId);
+        } else {
+            const labelText = pv.mediaType === 'EMAIL_ADDRESS' ? 'Email address'
+                            : pv.mediaType === 'PHONE_NUMBER'  ? 'Phone number' : 'Address';
+            document.getElementById('na-address-label').textContent = labelText + ' *';
+            document.getElementById('na-address').placeholder  = pv.addressPlaceholder || '';
+            document.getElementById('na-address-hint').textContent = pv.addressHint || '';
+            document.getElementById('na-provider-badge').innerHTML =
+                    '<span class="badge bg-secondary">' + escapeHtml(pv.configDisplayName) + '</span>';
+            document.getElementById('na-address').value = '';
+            document.getElementById('na-address').classList.remove('is-invalid');
+            document.getElementById('na-address-error').textContent = '';
+            document.getElementById('na-address-form').classList.remove('d-none');
+        }
+    }
+
+    function naGoBack() {
+        stopNaPoll();
+        if (naRegistrationId) {
+            fetch('/api/user/notification-media/telegram/register/' + naRegistrationId,
+                  { method: 'DELETE' }).catch(function () {});
+            naRegistrationId = null;
+        }
+        document.getElementById('na-address-form').classList.add('d-none');
+        document.getElementById('na-telegram-form').classList.add('d-none');
+        document.getElementById('na-back-wrap').classList.add('d-none');
+        selectedNotifAddr = null;
+        renderNaProviderPicker();
+    }
+
+    async function saveNotifAddress() {
+        if (!selectedNotifAddr) return;
+        const address = document.getElementById('na-address').value.trim();
+        const label   = document.getElementById('na-label').value.trim() || 'Default';
+        const addrEl  = document.getElementById('na-address');
+        const errEl   = document.getElementById('na-address-error');
+        addrEl.classList.remove('is-invalid');
+        errEl.textContent = '';
+        if (!address) {
+            addrEl.classList.add('is-invalid');
+            errEl.textContent = 'Address is required.';
+            return;
+        }
+        const btn = document.getElementById('btn-save-na');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving&hellip;';
+        try {
+            const res = await fetch('/api/user/notification-media', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    providerKey: selectedNotifAddr.providerKey,
+                    address:     address,
+                    label:       label,
+                    isDefault:   true
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setStep(5);
+            } else {
+                if (data.addressError) {
+                    addrEl.classList.add('is-invalid');
+                    errEl.textContent = data.addressError;
+                } else {
+                    showAlert(data.error || 'Failed to save.', 'danger');
+                }
+            }
+        } catch (e) {
+            showAlert('Request failed \u2014 please try again.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue';
+        }
+    }
+
+    // ── Telegram QR registration (wizard) ──────────────────────────────────────
+
+    async function startNaTelegramRegistration(configId) {
+        stopNaPoll();
+        naRegistrationId = null;
+        document.getElementById('na-tg-loading').style.display = '';
+        document.getElementById('na-tg-canvas').classList.add('d-none');
+        document.getElementById('na-tg-link-wrap').classList.add('d-none');
+        document.getElementById('na-tg-status').textContent = '';
+        try {
+            const res = await fetch('/api/user/notification-media/telegram/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ providerConfigId: configId, isDefault: true })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                document.getElementById('na-tg-loading').style.display = 'none';
+                document.getElementById('na-tg-status').textContent = data.error || 'Failed to start registration.';
+                return;
+            }
+            naRegistrationId = data.registrationId;
+            document.getElementById('na-tg-loading').style.display = 'none';
+            const canvas = document.getElementById('na-tg-canvas');
+            QRCode.toCanvas(canvas, data.url, { width: 200, margin: 2 }, function (err) {
+                if (!err) canvas.classList.remove('d-none');
+            });
+            document.getElementById('na-tg-deep-link').href = data.url;
+            document.getElementById('na-tg-link-wrap').classList.remove('d-none');
+            document.getElementById('na-tg-status').innerHTML =
+                '<span class="text-muted"><span class="spinner-grow spinner-grow-sm me-1"></span>Waiting for scan&hellip;</span>';
+            naPollTimer = setInterval(pollNaTgStatus, 2000);
+        } catch (e) {
+            document.getElementById('na-tg-loading').style.display = 'none';
+            document.getElementById('na-tg-status').textContent = 'Network error. Please try again.';
+        }
+    }
+
+    async function pollNaTgStatus() {
+        if (!naRegistrationId) return;
+        try {
+            const res  = await fetch('/api/user/notification-media/telegram/register/' + naRegistrationId);
+            const data = await res.json();
+            if (data.status === 'complete') {
+                stopNaPoll();
+                setStep(5);
+            } else if (data.status === 'expired') {
+                stopNaPoll();
+                document.getElementById('na-tg-status').innerHTML =
+                    '<span class="text-danger">Registration expired. Please try again.</span>';
+                naRegistrationId = null;
+            }
+        } catch (e) { /* ignore transient errors */ }
+    }
+
+    function stopNaPoll() {
+        if (naPollTimer) { clearInterval(naPollTimer); naPollTimer = null; }
+    }
+
+    function skipNotifications() { setStep(5); }
+
+    // ── Notification provider step ────────────────────────────────────────────
+
+    let notifProviderTypes    = [];
+    let selectedNotifProvider = null;
+
+    async function loadNotifProviderTypes() {
+        notifProviderTypes    = [];
+        selectedNotifProvider = null;
+        document.getElementById('np-loading').style.display    = '';
+        document.getElementById('np-provider-cards').classList.add('d-none');
+        document.getElementById('np-no-providers').classList.add('d-none');
+        document.getElementById('np-form-wrap').classList.add('d-none');
+        try {
+            const res = await fetch('/api/notifications/providers');
+            notifProviderTypes = res.ok ? await res.json() : [];
+        } catch (e) {
+            notifProviderTypes = [];
+        }
+        document.getElementById('np-loading').style.display = 'none';
+        renderNotifProviderCards();
+    }
+
+    function renderNotifProviderCards() {
+        const cardsEl = document.getElementById('np-provider-cards');
+        cardsEl.innerHTML = '';
+        if (!notifProviderTypes || notifProviderTypes.length === 0) {
+            document.getElementById('np-no-providers').classList.remove('d-none');
+            return;
+        }
+        notifProviderTypes.forEach(function (p) {
+            const div = document.createElement('div');
+            div.className = 'card provider-btn text-center p-2 rounded';
+            div.style.minWidth = '90px';
+            div.id = 'np-btn-' + p.providerKey;
+            div.innerHTML = '<div>' + notifProviderIcon(p.providerKey) + '</div>'
+                          + '<div class="fw-semibold small mt-1">' + escapeHtml(p.displayName) + '</div>';
+            div.onclick = function () { selectNotifProvider(p.providerKey); };
+            cardsEl.appendChild(div);
+        });
+        cardsEl.classList.remove('d-none');
+    }
+
+    function notifProviderIcon(key) {
+        if (key === 'telegram')  return '<i class="fa-brands fa-telegram fa-lg"></i>';
+        if (key === 'smtp')      return '<i class="fa-solid fa-envelope fa-lg"></i>';
+        if (key === 'sendgrid')  return '<i class="fa-solid fa-paper-plane fa-lg"></i>';
+        if (key === 'twilio')    return '<i class="fa-solid fa-phone fa-lg"></i>';
+        return '<i class="fa-solid fa-bell fa-lg"></i>';
+    }
+
+    function selectNotifProvider(key) {
+        selectedNotifProvider = notifProviderTypes.find(function (p) { return p.providerKey === key; });
+        if (!selectedNotifProvider) return;
+        document.querySelectorAll('#np-provider-cards .provider-btn').forEach(function (b) {
+            b.classList.toggle('selected', b.id === 'np-btn-' + key);
+        });
+        document.getElementById('np-display-name').value = selectedNotifProvider.displayName;
+        const fieldsEl = document.getElementById('np-fields');
+        fieldsEl.innerHTML = (selectedNotifProvider.settingDefinitions || []).map(function (def) {
+            const req = def.required ? ' <span class="text-danger">*</span>' : '';
+            return '<div class="mb-3">'
+                 + '<label class="form-label" for="np-f-' + def.key + '">' + escapeHtml(def.label) + req + '</label>'
+                 + '<input type="' + def.type + '" id="np-f-' + def.key + '"'
+                 + ' class="form-control np-setting-field" data-key="' + def.key + '"'
+                 + ' placeholder="' + escapeHtml(def.placeholder || '') + '" autocomplete="off">'
+                 + '</div>';
+        }).join('');
+        document.getElementById('np-field-errors').innerHTML = '';
+        document.getElementById('np-form-wrap').classList.remove('d-none');
+        clearAlert();
+    }
+
+    async function saveNotifProvider() {
+        if (!selectedNotifProvider) return;
+        const settings = {};
+        document.querySelectorAll('.np-setting-field').forEach(function (inp) {
+            settings[inp.dataset.key] = inp.value;
+        });
+        const displayName = document.getElementById('np-display-name').value.trim()
+                            || selectedNotifProvider.displayName;
+        const btn = document.getElementById('btn-save-notif-provider');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving&hellip;';
+        try {
+            const res = await fetch('/api/notifications/configs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    providerKey: selectedNotifProvider.providerKey,
+                    displayName: displayName,
+                    settings:    settings
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (data.fieldErrors) {
+                    const errEl = document.getElementById('np-field-errors');
+                    errEl.innerHTML = Object.entries(data.fieldErrors).map(function ([k, v]) {
+                        const inp = document.getElementById('np-f-' + k);
+                        if (inp) inp.classList.add('is-invalid');
+                        return '<div class="invalid-feedback d-block">' + escapeHtml(v) + '</div>';
+                    }).join('');
+                } else {
+                    showAlert(data.error || 'Failed to save provider.', 'danger');
+                }
+                return;
+            }
+            setStep(4);
+        } catch (e) {
+            showAlert('Request failed \u2014 please try again.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue';
+        }
+    }
+
+    function skipNotifProvider() { setStep(4); }
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // ── Account step ───────────────────────────────────────────────────────
+
+    async function createAccount() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const confirm  = document.getElementById('confirmPassword').value;
+
+        if (!username) { showAlert('Username is required.', 'danger'); return; }
+        if (password.length < 8) { showAlert('Password must be at least 8 characters.', 'danger'); return; }
+        if (password !== confirm) { showAlert('Passwords do not match.', 'danger'); return; }
+
+        const btn = document.getElementById('btn-create-account');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Creating&hellip;';
+
+        try {
+            const res = await fetch('/api/setup/account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, confirmPassword: confirm })
+            });
+            const data = await res.json();
+            if (data.error) { showAlert(data.error, 'danger'); return; }
+            setStep(2);
+        } catch (e) {
+            showAlert('Request failed — please try again.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right me-2"></i>Create Account';
+        }
+    }
+
+    async function testProvider() {
+        if (!selectedProvider) { showAlert('Please select a provider first.', 'warning'); return; }
+
+        const body = { provider: selectedProvider };
+        const apiKeyEl  = document.getElementById('apiKey-'  + selectedProvider);
+        const baseUrlEl = document.getElementById('baseUrl-' + selectedProvider);
+        if (apiKeyEl)  body.apiKey  = apiKeyEl.value.trim();
+        if (baseUrlEl) body.baseUrl = baseUrlEl.value.trim();
+
+        const btn = document.getElementById('btn-test');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Testing&hellip;';
+
+        try {
+            const res = await fetch('/api/setup/ai-provider/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.error) { showAlert(data.error, 'danger'); return; }
+
+            const sel = document.getElementById('default-model');
+            sel.innerHTML = '<option value="">— select a model —</option>';
+            (data.models || []).forEach(function(m) {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.displayName || m.id;
+                sel.appendChild(opt);
+            });
+            if (sel.options.length > 1) sel.selectedIndex = 1;
+
+            document.getElementById('model-select-area').classList.remove('d-none');
+            showAlert((data.models?.length || 0) + ' model(s) discovered. Select your default below.', 'success');
+        } catch (e) {
+            showAlert('Connection test failed — please check your credentials.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-plug me-2"></i>Test Connection &amp; Discover Models';
+        }
+    }
+
+    async function saveProvider() {
+        const model = document.getElementById('default-model').value;
+        if (!model) { showAlert('Please select a default model.', 'warning'); return; }
+
+        const body = {
+            provider:     selectedProvider,
+            defaultModel: model,
+            setAsGlobal:  document.getElementById('set-global').checked
+        };
+        const apiKeyEl  = document.getElementById('apiKey-'  + selectedProvider);
+        const baseUrlEl = document.getElementById('baseUrl-' + selectedProvider);
+        if (apiKeyEl)  body.apiKey  = apiKeyEl.value.trim();
+        if (baseUrlEl) body.baseUrl = baseUrlEl.value.trim();
+
+        const btn = document.getElementById('btn-save-provider');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Saving&hellip;';
+
+        try {
+            const res = await fetch('/api/setup/ai-provider', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.error) { showAlert(data.error, 'danger'); return; }
+            setStep(3);
+        } catch (e) {
+            showAlert('Save failed — please try again.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue';
+        }
+    }
+
+    // On load: auto-select Gemini if its API key is pre-configured in application.yml
+    fetch('/api/setup/status')
+        .then(function(r) { return r.json(); })
+        .then(function(s) { if (s.geminiApiKeyConfigured) selectProvider('GEMINI'); })
+        .catch(function() {});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

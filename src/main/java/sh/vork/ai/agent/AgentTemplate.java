@@ -19,12 +19,14 @@ import java.util.List;
  * @param allowedTools Spring bean IDs of the {@code ToolCallback} beans this
  *                     agent may invoke; an empty list means no tool restriction
  *                     is applied (all tools available)
+ * @param systemAgent  {@code true} for built-in agents that must not be deleted
  */
 public record AgentTemplate(
         String       uuid,
         String       name,
         String       systemPrompt,
-        List<String> allowedTools
+        List<String> allowedTools,
+        boolean      systemAgent
 ) implements DatabaseEntity {
 
     public AgentTemplate {
