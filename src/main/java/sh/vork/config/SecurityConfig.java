@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .requestMatchers("/setup", "/api/setup/**").permitAll()
                 .requestMatchers("/api/authorization/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/*.ico").permitAll()
+                .requestMatchers("/packages/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .anyRequest().authenticated()
