@@ -170,6 +170,7 @@ FINISHED_TURN, CONTINUE_TURN, and SWITCH_AGENT.
             List.of(
                     "compileJavaType",
                     "listJavaTypes",
+                    "getJavaTypeSource",
                     "getTypeSchema",
                     "saveTypeInstance",
                     "listTypeInstances",

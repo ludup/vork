@@ -1,0 +1,56 @@
+# =============================================================================
+# Vork — Docker Compose
+#
+# Usage:
+#   export GEMINI_API_KEY=your-key-here
+#   docker compose up --build
+#
+# Or create a .env file in this directory:
+#   GEMINI_API_KEY=your-key-here
+# =============================================================================
+
+services:
+
+  # ── MongoDB ─────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    # Expose locally for admin tools (Compass etc.); remove in production.
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Vork application ─────────────────────────────────────────────────────────
+  vork:
+    build:
+      # Parent directory so both jadaptive-orm/ and vork-prototype/ are in scope
+      context: ..
+      dockerfile: vork-prototype/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # MongoDB — these env vars override conf.d/database.properties
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: vork
+
+      # Gemini API key — required for AI features.
+      # Set GEMINI_API_KEY in your environment or in a .env file.
+      SPRING_AI_GOOGLE_GENAI_APIKEY: ${GEMINI_API_KEY}
+    volumes:
+      # Optional: mount your local conf.d/ so custom settings are preserved
+      # across container rebuilds. Comment out if you prefer env-var-only config.
+      - ./conf.d:/app/conf.d
+
+volumes:
+  mongodb_data:

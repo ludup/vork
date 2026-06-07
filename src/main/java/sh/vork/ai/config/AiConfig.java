@@ -650,6 +650,33 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
                 .build();
     }
 
+    /**
+     * {@code getJavaTypeSource} tool — retrieves the stored Java source for a
+     * compiled type, allowing the model to read it before making targeted edits.
+     */
+    @Bean
+    @ToolCategory("Schema & Types")
+    public ToolCallback getJavaTypeSource(DatabaseRepository<JavaType> javaTypeRepository) {
+        return FunctionToolCallback
+                .builder("getJavaTypeSource", (GetTypeSchemaRequest req) -> {
+                    JavaType jt = javaTypeRepository.get(req.fqn());
+                    if (jt == null) {
+                        return "{\"status\":\"error\",\"message\":\"Type not found: " + req.fqn() + "\"}";
+                    }
+                    return "{\"fqn\":\"" + jt.uuid() + "\",\"source\":" +
+                            objectMapper.valueToTree(jt.source()).toString() + "}";
+                })
+                .description(
+                        """
+                                Retrieve the stored Java source code for a compiled type by its fully-qualified class name. \
+                                Use this before modifying a type so you can read the existing definition and make targeted changes \
+                                rather than rewriting it from scratch.
+                                """
+                                .stripIndent())
+                .inputType(GetTypeSchemaRequest.class)
+                .build();
+    }
+
     // -------------------------------------------------------------------------
     // TypeDatabase CRUD tools
     // -------------------------------------------------------------------------
