@@ -31,7 +31,7 @@ public class SystemController {
 
     /** Returns the global default provider and model, or an empty object if not set. */
     @GetMapping("/settings")
-    public Map<String, String> getSettings() {
+    public Map<String, Object> getSettings() {
         log.debug("ENTER getSettings");
         SystemSettings s = systemSettingsService.getGlobal();
         if (s == null || s.defaultProvider() == null) {
@@ -39,10 +39,12 @@ public class SystemController {
             return Map.of();
         }
         log.debug("EXIT getSettings: [provider={}, model={}]", s.defaultProvider(), s.defaultModelId());
-        return Map.of(
-                "defaultProvider", s.defaultProvider(),
-                "defaultModelId",  s.defaultModelId()
-        );
+        var result = new java.util.LinkedHashMap<String, Object>();
+        result.put("defaultProvider",         s.defaultProvider());
+        result.put("defaultModelId",          s.defaultModelId());
+        result.put("appBaseUrl",              s.appBaseUrl() != null ? s.appBaseUrl() : "");
+        result.put("defaultOobTimeoutMinutes", s.defaultOobTimeoutMinutes() > 0 ? s.defaultOobTimeoutMinutes() : 15);
+        return result;
     }
 
     /** Updates the global default provider and model. */
@@ -55,11 +57,12 @@ public class SystemController {
         if (req.defaultModelId() == null || req.defaultModelId().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Model is required."));
         }
-        systemSettingsService.setGlobal(req.defaultProvider(), req.defaultModelId());
-        log.info("Global default updated via settings page [provider={}, model={}]",
-                req.defaultProvider(), req.defaultModelId());
+        systemSettingsService.setGlobal(req.defaultProvider(), req.defaultModelId(),
+                req.appBaseUrl(), req.defaultOobTimeoutMinutes() > 0 ? req.defaultOobTimeoutMinutes() : 0);
+        log.info("Global default updated via settings page [provider={}, model={}, baseUrl={}, oobTimeoutMins={}]",
+                req.defaultProvider(), req.defaultModelId(), req.appBaseUrl(), req.defaultOobTimeoutMinutes());
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
-    record SettingsRequest(String defaultProvider, String defaultModelId) {}
+    record SettingsRequest(String defaultProvider, String defaultModelId, String appBaseUrl, int defaultOobTimeoutMinutes) {}
 }

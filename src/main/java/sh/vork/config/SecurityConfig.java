@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .requestMatchers("/packages/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                .requestMatchers("/input-form/**").permitAll()
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
@@ -60,7 +61,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/authorization/**", "/api/chat/**", "/ws/**", "/logout",
                         "/api/setup/**", "/api/system/**", "/api/ai/**", "/api/agents/**",
-                        "/api/notifications/**", "/api/user/**")
+                        "/api/notifications/**", "/api/user/**", "/api/types/**")
             )
             .sessionManagement(session -> session
                 .sessionConcurrency(concurrency -> concurrency

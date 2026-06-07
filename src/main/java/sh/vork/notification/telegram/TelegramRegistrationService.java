@@ -143,6 +143,7 @@ public class TelegramRegistrationService {
                 chatId,
                 label,
                 makeDefault,
+                false,
                 System.currentTimeMillis());
         mediaRepo.save(media);
 
@@ -214,7 +215,7 @@ public class TelegramRegistrationService {
             stream.forEach(m -> mediaRepo.save(new UserNotificationMedia(
                     m.uuid(), m.userId(), m.providerKey(),
                     m.mediaType(), m.address(), m.label(),
-                    false, m.createdAt())));
+                    false, m.oobEnabled(), m.createdAt())));
         }
     }
 

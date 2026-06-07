@@ -45,6 +45,7 @@
                         <th>Address</th>
                         <th>Label</th>
                         <th>Provider</th>
+                        <th style="width:80px" class="text-center">OOB</th>
                         <th style="width:100px" class="text-center">Actions</th>
                     </tr>
                 </thead>
@@ -204,6 +205,9 @@
             const defaultBtn = m.isDefault
                 ? '<button class="btn btn-sm btn-link p-0 text-warning" title="Default address" disabled><i class="fa-solid fa-star"></i></button>'
                 : '<button class="btn btn-sm btn-link p-0 text-muted" title="Set as default" onclick="setDefault(\'' + m.uuid + '\')"><i class="fa-regular fa-star"></i></button>';
+            const oobBtn = m.oobEnabled
+                ? '<button class="btn btn-sm btn-link p-0 text-success" title="OOB notifications on — click to disable" onclick="toggleOob(\'' + m.uuid + '\')"><i class="fa-solid fa-bell"></i></button>'
+                : '<button class="btn btn-sm btn-link p-0 text-muted"   title="OOB notifications off — click to enable"  onclick="toggleOob(\'' + m.uuid + '\')"><i class="fa-regular fa-bell-slash"></i></button>';
             const row = document.createElement('tr');
             row.id = 'row-' + m.uuid;
             row.innerHTML =
@@ -211,6 +215,7 @@
                 '<td class="fw-semibold font-monospace small">' + escapeHtml(m.address) + '</td>' +
                 '<td class="text-muted small">' + escapeHtml(m.label || '') + '</td>' +
                 '<td><span class="badge bg-secondary">' + escapeHtml(providerLabel) + '</span></td>' +
+                '<td class="text-center">' + oobBtn + '</td>' +
                 '<td class="text-center">' +
                 '  <div class="d-flex justify-content-center gap-2">' +
                 '    ' + defaultBtn +
@@ -426,6 +431,19 @@
             const res = await fetch('/api/user/notification-media/' + id + '/default', { method: 'PUT' });
             if (res.ok) { await loadAll(); showAlert('Default address updated.', 'success'); }
             else showAlert('Failed to update default.', 'danger');
+        } catch (e) { showAlert('Network error.', 'danger'); }
+    }
+
+    async function toggleOob(id) {
+        try {
+            const res = await fetch('/api/user/notification-media/' + id + '/oob', { method: 'PUT' });
+            if (res.ok) {
+                const data = await res.json();
+                const m = allMedia.find(function (x) { return x.uuid === id; });
+                if (m) m.oobEnabled = data.oobEnabled;
+                renderTable();
+                showAlert(data.oobEnabled ? 'OOB notifications enabled for this address.' : 'OOB notifications disabled for this address.', 'success');
+            } else showAlert('Failed to toggle OOB setting.', 'danger');
         } catch (e) { showAlert('Network error.', 'danger'); }
     }
 

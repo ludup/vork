@@ -90,7 +90,7 @@ public class AiJobRunner implements Runnable {
                     now,
                     0,
                     List.of(seedMessage),
-                    AiSession.defaultEnvironmentVariables(),
+                    buildEnvVars(job),
                     AiSessionStatus.RUNNING,
                     job.agentTemplateId(),
                     job.modelId());
@@ -179,6 +179,15 @@ public class AiJobRunner implements Runnable {
                 job.agentTemplateId(),
                 job.provider(),
                 job.modelId(),
+                job.oobTimeoutMinutes(),
                 newStatus));
+    }
+
+    private static java.util.concurrent.ConcurrentHashMap<String, String> buildEnvVars(ScheduledJob job) {
+        java.util.concurrent.ConcurrentHashMap<String, String> env = AiSession.defaultEnvironmentVariables();
+        if (job.oobTimeoutMinutes() > 0) {
+            env.put("vork.oob.timeout.minutes", String.valueOf(job.oobTimeoutMinutes()));
+        }
+        return env;
     }
 }

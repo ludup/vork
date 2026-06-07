@@ -49,4 +49,9 @@ public class SecureCredentialStore {
         }
         return encryptionService.decrypt(secret.encryptedPayload());
     }
+
+    public void deleteSecret(VorkUser user, String key) {
+        String uuid = UUID.nameUUIDFromBytes((user.uuid() + ":" + key).getBytes()).toString();
+        secretRepository.delete(uuid);
+    }
 }

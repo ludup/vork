@@ -247,6 +247,36 @@ body.sidebar-collapsed .sidebar-top {
     max-width: 14rem;
 }
 
+/* ── Pending-sessions alert bar ──────────────────────────────────────────── */
+
+.pending-sessions-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.85rem;
+    background: rgba(253, 170, 2, 0.14);
+    border-bottom: 1px solid rgba(253, 170, 2, 0.35);
+    color: #ffc107;
+}
+
+.pending-sessions-alert .pending-alert-link {
+    color: #ffd54f;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 213, 79, 0.5);
+}
+
+.pending-sessions-alert .pending-alert-link:hover {
+    color: #fff;
+}
+
+.pending-sessions-alert .btn-close-sm {
+    width: 0.65em;
+    height: 0.65em;
+}
+
 /* ── Messages ─────────────────────────────────────────────────────────────── */
 
 .chat-messages {
@@ -372,7 +402,9 @@ body.sidebar-collapsed .sidebar-top {
 .prompt-args {
     margin-top: 0.45rem;
     margin-bottom: 0.45rem;
-    max-height: 180px;
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .prompt-args-inline-label {
@@ -416,7 +448,9 @@ body.sidebar-collapsed .sidebar-top {
 .prompt-args-toggle .prompt-args {
     margin: 0;
     padding: 0 0.65rem 0.55rem;
-    max-height: none;
+    max-height: 380px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .prompt-actions {

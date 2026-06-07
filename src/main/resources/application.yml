@@ -8,6 +8,8 @@ spring:
         chat:
           options:
             model: gemini-2.5-flash
+            thinking-budget: 0
+            include-thoughts: false
 
   # Thymeleaf configuration for login and authorization pages
   thymeleaf:

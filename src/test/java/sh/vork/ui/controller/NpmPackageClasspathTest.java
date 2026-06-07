@@ -51,7 +51,7 @@ class NpmPackageClasspathTest {
     @MethodSource("packages")
     @DisplayName("Each npm package has a LOCATOR properties file with a version")
     void locatorExists_andContainsVersion(String groupId, String artifactId,
-                                          @SuppressWarnings("unused") String ignored) throws IOException {
+                                         String ignored) throws IOException {
         String locatorPath = "META-INF/LOCATOR." + groupId + "." + artifactId + ".properties";
         InputStream in = classpathStream(locatorPath);
         assertNotNull(in,

@@ -24,8 +24,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
+import sh.vork.scheduling.service.SystemBackgroundAuthentication;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -147,6 +150,32 @@ public class ChatService {
 
     public AiSession createNewSession(AiProvider provider) {
         return createNewSession(provider, null);
+    }
+
+    /**
+     * Creates a new AI session for a Telegram user.
+     *
+     * @param username  the authenticated Vork username (from UserNotificationMedia)
+     * @param configId  UUID of the NotificationProviderConfig (which bot received the message)
+     * @param chatId    Telegram chat ID (used to reply)
+     * @param botToken  Telegram bot token (stored in session env so the consumer can reply)
+     * @return the newly created session
+     */
+    public AiSession createTelegramSession(String username, String configId,
+                                            String chatId, String botToken, String providerName) {
+        String uuid = UUID.randomUUID().toString();
+        Map<String, String> env = new java.util.HashMap<>(AiSession.defaultEnvironmentVariables());
+        env.put("TELEGRAM_CONFIG_ID", configId);
+        env.put("TELEGRAM_CHAT_ID",   chatId);
+        env.put("TELEGRAM_BOT_TOKEN", botToken);
+        AiSession session = new AiSession(uuid, providerName,
+                SessionOriginMode.TELEGRAM, username, DEFAULT_SESSION_NAME,
+                System.currentTimeMillis(), 0, List.of(),
+                java.util.Collections.unmodifiableMap(env),
+                AiSessionStatus.RUNNING, AgentTemplateSeeder.UUID_CONCIERGE, null);
+        sessionRepo.save(session);
+        log.info("Created Telegram session [id={}, user={}, chatId={}]", uuid, username, chatId);
+        return session;
     }
 
     public AiSession getSessionForCurrentUser(String sessionUuid) {
@@ -384,9 +413,23 @@ public class ChatService {
             throw new IllegalStateException("Access denied for session: " + sessionUuid);
         }
 
-        // Delegate to the existing logic by temporarily establishing SecurityContext if needed
-        // For now, we'll inline the send logic to avoid SecurityContext dependency
-        return sendMessageWithSession(session, content, attachmentUuids, provider);
+        // Ensure tools running on non-web threads (Telegram, background) can resolve the principal
+        SecurityContext prevCtx = SecurityContextHolder.getContext();
+        boolean needsCtx = prevCtx.getAuthentication() == null
+                || prevCtx.getAuthentication().getName() == null
+                || prevCtx.getAuthentication().getName().isBlank();
+        if (needsCtx) {
+            SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+            ctx.setAuthentication(new SystemBackgroundAuthentication(username));
+            SecurityContextHolder.setContext(ctx);
+        }
+        try {
+            return sendMessageWithSession(session, content, attachmentUuids, provider);
+        } finally {
+            if (needsCtx) {
+                SecurityContextHolder.setContext(prevCtx);
+            }
+        }
     }
 
     /**
@@ -395,6 +438,13 @@ public class ChatService {
     private AiChatMessage sendMessageWithSession(AiSession session, String content,
                                                   List<String> attachmentUuids, AiProvider provider) {
         String sessionUuid = session.uuid();
+        // Fall back to the provider stored in the session when none is supplied by the caller
+        AiProvider effectiveProvider = provider;
+        if (effectiveProvider == null && session.provider() != null && !session.provider().isBlank()) {
+            try { effectiveProvider = AiProvider.valueOf(session.provider()); }
+            catch (IllegalArgumentException ignored) {}
+        }
+        final AiProvider resolvedProvider = effectiveProvider;
         ToolExecutionContext.bindSessionUuid(sessionUuid);
         ToolExecutionContext.hydrate(session.environmentVariables());
         try {
@@ -402,7 +452,7 @@ public class ChatService {
 
             log.info("Chat turn [session={}, history={} msgs, attachments={}, provider={}]",
                     sessionUuid, history.size(),
-                    attachmentUuids == null ? 0 : attachmentUuids.size(), provider);
+                    attachmentUuids == null ? 0 : attachmentUuids.size(), resolvedProvider);
 
             List<AttachmentRef> refs = new ArrayList<>();
             List<Media> media = new ArrayList<>();
@@ -450,7 +500,7 @@ public class ChatService {
                     content == null ? "" : content, now, userRefs);
 
             try {
-                return executeAgentLoop(session, history, effectiveContent, media, provider, userMsg, refs);
+                return executeAgentLoop(session, history, effectiveContent, media, resolvedProvider, userMsg, refs);
             } catch (ToolSuspensionException ex) {
                 String simulatedToolCallId = "pending-" + UUID.randomUUID();
                 List<ToolCallRef> pendingToolCalls = List.of(
@@ -814,6 +864,13 @@ public class ChatService {
             String json = rawResponse.strip();
             if (json.startsWith("```")) {
                 json = json.replaceAll("(?s)^```[a-zA-Z]*\\n?", "").replaceAll("(?s)```\\s*$", "").strip();
+            }
+            // If a thinking model leaks a reasoning prefix, skip to the first '{'.
+            if (!json.startsWith("{")) {
+                int brace = json.indexOf('{');
+                if (brace > 0) {
+                    json = json.substring(brace).strip();
+                }
             }
             return objectMapper.readValue(json, StructuredAgentResponse.class);
         } catch (Exception e) {

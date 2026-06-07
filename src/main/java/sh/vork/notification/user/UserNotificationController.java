@@ -48,6 +48,7 @@ import sh.vork.notification.telegram.TelegramRegistrationService;
  *   <li>{@code POST   /api/user/notification-media}          — add a media address</li>
  *   <li>{@code DELETE /api/user/notification-media/{id}}     — remove a media address</li>
  *   <li>{@code PUT    /api/user/notification-media/{id}/default} — set as default</li>
+ *   <li>{@code PUT    /api/user/notification-media/{id}/oob}     — toggle OOB notifications</li>
  *   <li>{@code GET    /api/user/notification-media/providers} — configured providers only</li>
  * </ul>
  */
@@ -201,6 +202,7 @@ public class UserNotificationController {
                 req.address().trim(),
                 req.label() != null ? req.label().trim() : "",
                 makeDefault,
+                false,
                 System.currentTimeMillis());
         mediaRepo.save(media);
         log.info("User notification media added [userId={}, type={}, provider={}]",
@@ -236,9 +238,27 @@ public class UserNotificationController {
         mediaRepo.save(new UserNotificationMedia(
                 media.uuid(), media.userId(), media.providerKey(),
                 media.mediaType(), media.address(), media.label(),
-                true, media.createdAt()));
+                true, media.oobEnabled(), media.createdAt()));
         log.info("Default notification media set [id={}, userId={}]", id, userId);
         return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @PutMapping("/api/user/notification-media/{id}/oob")
+    @ResponseBody
+    public ResponseEntity<?> toggleOob(@PathVariable String id) {
+        String userId = currentUserId();
+        log.debug("ENTER toggleOob: [id={}, userId={}]", id, userId);
+        UserNotificationMedia media = mediaRepo.get(id);
+        if (media == null || !media.userId().equals(userId)) {
+            return ResponseEntity.notFound().build();
+        }
+        boolean newOob = !media.oobEnabled();
+        mediaRepo.save(new UserNotificationMedia(
+                media.uuid(), media.userId(), media.providerKey(),
+                media.mediaType(), media.address(), media.label(),
+                media.isDefault(), newOob, media.createdAt()));
+        log.info("OOB notification toggled [id={}, userId={}, oobEnabled={}]", id, userId, newOob);
+        return ResponseEntity.ok(Map.of("oobEnabled", newOob));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -259,7 +279,7 @@ public class UserNotificationController {
             stream.forEach(m -> mediaRepo.save(new UserNotificationMedia(
                     m.uuid(), m.userId(), m.providerKey(),
                     m.mediaType(), m.address(), m.label(),
-                    false, m.createdAt())));
+                    false, m.oobEnabled(), m.createdAt())));
         }
     }
 
@@ -350,7 +370,7 @@ public class UserNotificationController {
 
     private MediaView toView(UserNotificationMedia m) {
         return new MediaView(m.uuid(), m.providerKey(), m.mediaType().name(),
-                m.address(), m.label(), m.isDefault());
+                m.address(), m.label(), m.isDefault(), m.oobEnabled());
     }
 
     // ── DTOs ──────────────────────────────────────────────────────────────────
@@ -372,7 +392,8 @@ public class UserNotificationController {
             String  mediaType,
             String  address,
             String  label,
-            boolean isDefault
+            boolean isDefault,
+            boolean oobEnabled
     ) {}
 
     record MediaRequest(

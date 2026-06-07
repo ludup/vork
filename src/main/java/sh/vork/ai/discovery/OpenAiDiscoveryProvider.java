@@ -48,11 +48,16 @@ public class OpenAiDiscoveryProvider implements ModelDiscoveryProvider {
             log.debug("OpenAI: no API key configured, skipping discovery");
             return List.of();
         }
+        String apiKey = configService.decryptApiKey(cfg.apiKey());
+        if (apiKey == null || apiKey.isBlank()) {
+            log.debug("OpenAI: API key could not be decrypted, skipping discovery");
+            return List.of();
+        }
         log.debug("OpenAI: discovering models");
         try {
             Map<String, Object> response = restClient.get()
                     .uri("/models")
-                    .header("Authorization", "Bearer " + cfg.apiKey())
+                    .header("Authorization", "Bearer " + apiKey)
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
             if (response == null) return List.of();

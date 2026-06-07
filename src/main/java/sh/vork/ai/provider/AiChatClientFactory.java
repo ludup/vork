@@ -43,7 +43,7 @@ public class AiChatClientFactory {
     public AiChatClientFactory(
             @Qualifier("chatClientRegistry") Map<AiProvider, ChatClient> baseRegistry,
             AiProviderConfigService configService) {
-        this.baseRegistry = baseRegistry;
+        this.baseRegistry  = baseRegistry;
         this.configService = configService;
     }
 
@@ -91,7 +91,7 @@ public class AiChatClientFactory {
 
     private ChatClient buildOpenAiClient(AiProviderConfig config) {
         try {
-            String apiKey = config.apiKey();
+            String apiKey = configService.decryptApiKey(config.apiKey());
             if (apiKey == null || apiKey.isBlank()) {
                 log.warn("OpenAI API key is blank — cannot build client");
                 return null;

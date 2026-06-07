@@ -7,12 +7,17 @@ import org.springframework.stereotype.Service;
 import com.jadaptive.orm.DatabaseRepository;
 
 import sh.vork.ai.AiProvider;
+import sh.vork.ai.security.encrypt.EncryptionService;
 
 /**
  * CRUD service for {@link AiProviderConfig}.
  *
  * <p>The primary key ({@code uuid}) is always {@code provider.name().toLowerCase()}
  * so configs are looked up by provider without a secondary index.
+ *
+ * <p>API keys are encrypted at rest via {@link EncryptionService} before being
+ * persisted.  Callers that need the plaintext key must call
+ * {@link #decryptApiKey(String)}.
  */
 @Service
 public class AiProviderConfigService {
@@ -20,9 +25,23 @@ public class AiProviderConfigService {
     private static final Logger log = LoggerFactory.getLogger(AiProviderConfigService.class);
 
     private final DatabaseRepository<AiProviderConfig> configRepo;
+    private final EncryptionService encryptionService;
 
-    public AiProviderConfigService(DatabaseRepository<AiProviderConfig> configRepo) {
-        this.configRepo = configRepo;
+    public AiProviderConfigService(DatabaseRepository<AiProviderConfig> configRepo,
+                                   EncryptionService encryptionService) {
+        this.configRepo        = configRepo;
+        this.encryptionService = encryptionService;
+    }
+
+    /**
+     * Decrypts an API key previously encrypted by this service.
+     * Returns {@code null} if {@code encryptedKey} is {@code null} or blank.
+     */
+    public String decryptApiKey(String encryptedKey) {
+        if (encryptedKey == null || encryptedKey.isBlank()) {
+            return encryptedKey;
+        }
+        return encryptionService.decrypt(encryptedKey);
     }
 
     /** Returns the stored config for the given provider, or {@code null} if none is saved. */
@@ -45,7 +64,10 @@ public class AiProviderConfigService {
                                        String defaultModel,
                                        boolean enabled) {
         String k = key(provider);
-        AiProviderConfig config = new AiProviderConfig(k, provider.name(), apiKey, baseUrl, enabled, defaultModel);
+        String storedKey = (apiKey != null && !apiKey.isBlank())
+                ? encryptionService.encrypt(apiKey)
+                : apiKey;
+        AiProviderConfig config = new AiProviderConfig(k, provider.name(), storedKey, baseUrl, enabled, defaultModel);
         configRepo.save(config);
         log.info("AI provider config saved [provider={}]", provider);
         return config;

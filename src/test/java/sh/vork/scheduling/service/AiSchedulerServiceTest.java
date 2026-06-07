@@ -30,7 +30,7 @@ class AiSchedulerServiceTest {
     private static ScheduledJob job(String id, InvocationType type, long repeatDuration,
                                     DurationType durationType, Instant start, ScheduledJobStatus status) {
         return new ScheduledJob(id, "Job " + id, "prompt", "sid", "alice",
-                type, start, repeatDuration, durationType, 0L, 0L, null, null, null, status);
+                type, start, repeatDuration, durationType, 0L, 0L, null, null, null, 0, status);
     }
 
     @Test
@@ -102,7 +102,7 @@ class AiSchedulerServiceTest {
 
         // Null durationType and status — service should default them
         ScheduledJob jobIn = new ScheduledJob(" ", "Generated Job", "One shot", "sid-3", "charlie",
-                InvocationType.ONE_TIME, null, 0, null, 0L, 0L, null, null, null, null);
+                InvocationType.ONE_TIME, null, 0, null, 0L, 0L, null, null, null, 0, null);
 
         ScheduledJob out = service.scheduleJob(jobIn);
 

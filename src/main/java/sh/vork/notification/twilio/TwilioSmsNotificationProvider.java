@@ -138,4 +138,9 @@ public class TwilioSmsNotificationProvider implements NotificationProvider {
             throw new NotificationException("Failed to send via Twilio: " + e.getMessage(), e);
         }
     }
+
+    @Override
+    public String formatDirectNotification(String address, String title, String body) {
+        return "To: " + address + "\n\n" + title + ": " + body;
+    }
 }

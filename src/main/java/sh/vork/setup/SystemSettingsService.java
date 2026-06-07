@@ -29,15 +29,52 @@ public class SystemSettingsService {
     }
 
     /**
-     * Persists the global default provider and model.
-     *
-     * @param provider   AiProvider enum name (e.g. {@code "GEMINI"})
-     * @param modelId    model identifier (e.g. {@code "gemini-2.5-flash"})
+     * Persists the global default provider and model, preserving any existing {@code appBaseUrl}
+     * and {@code defaultOobTimeoutMinutes}.
      */
     public SystemSettings setGlobal(String provider, String modelId) {
-        SystemSettings settings = new SystemSettings(GLOBAL_KEY, provider, modelId);
+        SystemSettings existing = getGlobal();
+        String baseUrl = existing != null ? existing.appBaseUrl() : null;
+        int oobTimeout = existing != null ? existing.defaultOobTimeoutMinutes() : 0;
+        return setGlobal(provider, modelId, baseUrl, oobTimeout);
+    }
+
+    /**
+     * Persists the global default provider, model, and public base URL, preserving
+     * any existing {@code defaultOobTimeoutMinutes}.
+     */
+    public SystemSettings setGlobal(String provider, String modelId, String appBaseUrl) {
+        SystemSettings existing = getGlobal();
+        int oobTimeout = existing != null ? existing.defaultOobTimeoutMinutes() : 0;
+        return setGlobal(provider, modelId, appBaseUrl, oobTimeout);
+    }
+
+    /**
+     * Persists all global settings including the default OOB relay timeout.
+     *
+     * @param provider              AiProvider enum name
+     * @param modelId               model identifier
+     * @param appBaseUrl            public-facing base URL; may be null
+     * @param defaultOobTimeoutMins default OOB timeout in minutes; 0 means 15 minutes will be used at runtime
+     */
+    public SystemSettings setGlobal(String provider, String modelId, String appBaseUrl,
+                                     int defaultOobTimeoutMins) {
+        String effectiveUrl = (appBaseUrl != null && !appBaseUrl.isBlank()) ? appBaseUrl
+                : (getGlobal() != null ? getGlobal().appBaseUrl() : null);
+        SystemSettings settings = new SystemSettings(GLOBAL_KEY, provider, modelId,
+                effectiveUrl, defaultOobTimeoutMins);
         repo.save(settings);
-        log.info("Global default updated [provider={}, model={}]", provider, modelId);
+        log.info("Global settings updated [provider={}, model={}, baseUrl={}, oobTimeoutMins={}]",
+                provider, modelId, appBaseUrl, defaultOobTimeoutMins);
         return settings;
+    }
+
+    /**
+     * Returns the effective default OOB timeout: the stored value if &gt; 0,
+     * otherwise 15 minutes (suitable for Telegram / interactive sessions).
+     */
+    public int getDefaultOobTimeoutMinutes() {
+        SystemSettings s = getGlobal();
+        return (s != null && s.defaultOobTimeoutMinutes() > 0) ? s.defaultOobTimeoutMinutes() : 15;
     }
 }

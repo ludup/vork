@@ -42,7 +42,7 @@ class AiJobRunnerTest {
         return new ScheduledJob(id, "Job " + id, "prompt-" + id, "sid-" + id, "alice",
                 type, Instant.parse("2026-05-17T10:15:30Z"),
                 repeatDuration, durationType,
-                0L, 0L, null, null, null, status);
+                0L, 0L, null, null, null, 0, status);
     }
 
     @Test

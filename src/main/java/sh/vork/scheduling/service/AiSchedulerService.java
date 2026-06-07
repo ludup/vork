@@ -77,6 +77,7 @@ public class AiSchedulerService {
                 job.agentTemplateId(),
                 job.provider(),
                 job.modelId(),
+                job.oobTimeoutMinutes(),
                 job.status() == null ? ScheduledJobStatus.WAITING : job.status());
 
         // Cancel any existing future for this id
@@ -94,7 +95,8 @@ public class AiSchedulerService {
                 id, base.name(), base.aiPrompt(), base.sessionUuid(),
                 base.userId(), type, base.startTime(), base.repeatDuration(),
                 base.durationType(), base.lastExecutionTime(), nextExec,
-                base.agentTemplateId(), base.provider(), base.modelId(), base.status());
+                base.agentTemplateId(), base.provider(), base.modelId(),
+                base.oobTimeoutMinutes(), base.status());
         jobRepository.save(normalized);
 
         AiJobRunner runner = new AiJobRunner(normalized, backgroundOrchestrationEngine,
@@ -225,7 +227,8 @@ public class AiSchedulerService {
                     job.id(), job.name(), job.aiPrompt(), job.sessionUuid(),
                     job.userId(), job.invocationType(), job.startTime(), job.repeatDuration(),
                     job.durationType(), job.lastExecutionTime(), 0L,
-                    job.agentTemplateId(), job.provider(), job.modelId(), ScheduledJobStatus.WAITING));
+                    job.agentTemplateId(), job.provider(), job.modelId(),
+                    job.oobTimeoutMinutes(), ScheduledJobStatus.WAITING));
             log.info("Job marked waiting after authorization resume [id={}, tracking={}]",
                     job.id(), trackingSessionUuid);
         } else {
@@ -246,7 +249,8 @@ public class AiSchedulerService {
         return new ScheduledJob(job.id(), job.name(), job.aiPrompt(), job.sessionUuid(),
                 job.userId(), job.invocationType(), job.startTime(), job.repeatDuration(),
                 job.durationType(), job.lastExecutionTime(), job.nextExecutionTime(),
-                job.agentTemplateId(), job.provider(), job.modelId(), status);
+                job.agentTemplateId(), job.provider(), job.modelId(),
+                job.oobTimeoutMinutes(), status);
     }
 
     public static Duration toDuration(long amount, DurationType type) {

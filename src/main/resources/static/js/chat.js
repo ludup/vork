@@ -948,10 +948,28 @@ function findBestTerminalViewForToolResult(command, terminalId) {
     return null;
 }
 
+function renderDeniedToolMessage(toolName) {
+    const row = document.createElement('div');
+    row.className = 'agent-transition-row';
+    row.innerHTML = '<i class="fa-solid fa-ban" aria-hidden="true"></i>'
+        + '<span>Request denied: <code>' + escapeHtml(toolName || 'tool') + '</code></span>';
+    messagesArea.insertBefore(row, typingEl);
+    scrollBottom();
+}
+
 async function renderLiveToolMessage(msg) {
     const transcript = tryGetTerminalTranscript(msg);
     if (!transcript) {
-        renderMessage(msg);
+        // Check whether this is a DENIED tool response and render a small indicator.
+        // All other non-terminal TOOL messages are internal plumbing — skip silently.
+        const payload = tryParseJson(msg.content);
+        const firstResponse = payload && Array.isArray(payload.responses) && payload.responses.length > 0
+            ? payload.responses[0]
+            : null;
+        const responseData = firstResponse ? tryParseJson(firstResponse.responseData) : null;
+        if (responseData && responseData.status === 'DENIED') {
+            renderDeniedToolMessage(msg.toolName);
+        }
         return;
     }
 
@@ -1885,6 +1903,7 @@ function loadSession(targetSessionUuid) {
 
             loadSessionList();
             focusMessageInput();
+            checkPendingSessions();
 
             // Show a welcome message for new (empty) sessions
             if (messages.length === 0) {
@@ -2070,6 +2089,41 @@ const welcomeSignal = (function () {
 }());
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
+
+// ── Pending sessions alert ────────────────────────────────────────────────────
+
+/**
+ * Checks whether there are any off-channel sessions (Telegram / Background)
+ * currently awaiting user input.  If so, shows a non-intrusive amber alert bar
+ * above the message feed with a link to /pending-sessions.
+ *
+ * Called once per session initialisation so the user is notified at login time.
+ */
+function checkPendingSessions() {
+    fetch('/api/chat/sessions/pending-input')
+        .then(function (r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+        .then(function (sessions) {
+            var alertEl = document.getElementById('pending-sessions-alert');
+            if (!alertEl) return;
+            if (!sessions || sessions.length === 0) {
+                alertEl.classList.add('d-none');
+                return;
+            }
+            var count = sessions.length;
+            var label = count === 1 ? '1 session is' : count + ' sessions are';
+            alertEl.innerHTML =
+                '<i class="fa-solid fa-inbox me-2"></i>'
+                + '<strong>' + label + ' waiting for your input.</strong> '
+                + '<a href="/pending-sessions" class="pending-alert-link">Review now</a>'
+                + '<button type="button" class="btn-close btn-close-white btn-close-sm ms-auto" aria-label="Dismiss"></button>';
+            alertEl.classList.remove('d-none');
+
+            alertEl.querySelector('.btn-close').addEventListener('click', function () {
+                alertEl.classList.add('d-none');
+            });
+        })
+        .catch(function () { /* silent — non-critical */ });
+}
 
 // Load available provider/model options first, then initialise the session.
 // The dropdown is pre-seeded with a Gemini placeholder so the UI is usable

@@ -626,7 +626,7 @@ class ChatAuthorizationControllerIsolationTest {
         private String lastNewUserMessage;
 
         private RecordingAiService(String nextOutput) {
-            super(Map.of(), null, null, null, null, Map.of());
+            super(Map.of(), null, null, null, null, Map.of(), null);
             this.nextOutput = nextOutput;
         }
 
@@ -655,7 +655,7 @@ class ChatAuthorizationControllerIsolationTest {
 
         private static final class FailingAiService extends AiOrchestrationService {
                 private FailingAiService() {
-                        super(Map.of(), null, null, null, null, Map.of());
+                        super(Map.of(), null, null, null, null, Map.of(), null);
                 }
 
                 @Override

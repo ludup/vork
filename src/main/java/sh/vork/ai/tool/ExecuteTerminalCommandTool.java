@@ -36,7 +36,7 @@ public class ExecuteTerminalCommandTool extends AbstractTerminalTool implements 
                 if (command == null || command.isBlank()) {
                     return argumentsJson;
                 }
-                return "```bash\n" + command + "\n```";
+                return command;
             } catch (Exception ex) {
                 return argumentsJson;
             }

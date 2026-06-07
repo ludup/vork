@@ -192,7 +192,7 @@ class ChatServiceNoCandidateFallbackTest {
         int simpleCalls;
 
         private FallbackAiService() {
-            super(Map.of(), null, null, null, null, Map.of());
+            super(Map.of(), null, null, null, null, Map.of(), null);
         }
 
         @Override
@@ -215,7 +215,7 @@ class ChatServiceNoCandidateFallbackTest {
         int simpleCalls;
 
         private DoubleFailureAiService() {
-            super(Map.of(), null, null, null, null, Map.of());
+            super(Map.of(), null, null, null, null, Map.of(), null);
         }
 
         @Override
@@ -238,7 +238,7 @@ class ChatServiceNoCandidateFallbackTest {
         private final String sessionUuid;
 
         private CompletingDuringGenerationAiService(MapDatabaseRepository<AiSession> sessionRepo, String sessionUuid) {
-            super(Map.of(), null, null, null, null, Map.of());
+            super(Map.of(), null, null, null, null, Map.of(), null);
             this.sessionRepo = sessionRepo;
             this.sessionUuid = sessionUuid;
         }
@@ -267,7 +267,7 @@ class ChatServiceNoCandidateFallbackTest {
         private List<org.springframework.ai.chat.messages.Message> lastConversationHistory = List.of();
 
         private RecordingHistoryAiService() {
-            super(Map.of(), null, null, null, null, Map.of());
+            super(Map.of(), null, null, null, null, Map.of(), null);
         }
 
         @Override

@@ -10,8 +10,10 @@ import com.jadaptive.orm.DatabaseEntity;
  * {@code "gemini"}) so configs can be retrieved with a single
  * {@code repo.get(provider.name().toLowerCase())} call.
  *
- * <p>API keys are stored in plain text for now.  TODO: encrypt at rest
- * using {@code EncryptionService} before production use.
+ * <p>API keys are encrypted at rest by {@link sh.vork.ai.security.encrypt.EncryptionService}
+ * before being persisted.  The {@code apiKey} field on a loaded record contains the encrypted
+ * form; callers that need the plaintext key must go through
+ * {@link AiProviderConfigService#decryptApiKey(String)}.
  */
 public record AiProviderConfig(
         String uuid,

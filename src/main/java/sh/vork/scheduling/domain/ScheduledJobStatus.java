@@ -9,5 +9,7 @@ public enum ScheduledJobStatus {
     /** Suspended — a running turn requires user authorization before continuing. */
     AWAITING_INPUT,
     /** User-paused — will not execute until the user explicitly resumes it. */
-    PAUSED
+    PAUSED,
+    /** One-time job that has finished executing. */
+    COMPLETED
 }

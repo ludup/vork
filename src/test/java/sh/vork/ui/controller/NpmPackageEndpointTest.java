@@ -83,7 +83,7 @@ class NpmPackageEndpointTest {
     @MethodSource("packageEndpoints")
     @DisplayName("Returns 200 with correct Content-Type and non-empty body")
     void packageIsServed(String path, String expectedContentType,
-                         @SuppressWarnings("unused") String label) throws Exception {
+                         String label) throws Exception {
         MockHttpServletRequest  req  = request(path);
         MockHttpServletResponse resp = new MockHttpServletResponse();
 
@@ -102,8 +102,8 @@ class NpmPackageEndpointTest {
     @ParameterizedTest(name = "{2}")
     @MethodSource("packageEndpoints")
     @DisplayName("Response body is at least 1 KB (confirms real content, not stub)")
-    void packageBodyIsSubstantial(String path, @SuppressWarnings("unused") String ignored,
-                                  @SuppressWarnings("unused") String label) throws Exception {
+    void packageBodyIsSubstantial(String path, String ignored,
+                                  String label) throws Exception {
         MockHttpServletRequest  req  = request(path);
         MockHttpServletResponse resp = new MockHttpServletResponse();
 
@@ -117,8 +117,8 @@ class NpmPackageEndpointTest {
     @ParameterizedTest(name = "{2}")
     @MethodSource("packageEndpoints")
     @DisplayName("Cache-Control header is set")
-    void packageHasCacheControlHeader(String path, @SuppressWarnings("unused") String ct,
-                                      @SuppressWarnings("unused") String label) throws Exception {
+    void packageHasCacheControlHeader(String path, String ct,
+                                      String label) throws Exception {
         MockHttpServletRequest  req  = request(path);
         MockHttpServletResponse resp = new MockHttpServletResponse();
 

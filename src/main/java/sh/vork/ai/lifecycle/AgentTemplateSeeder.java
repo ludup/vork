@@ -28,6 +28,7 @@ public class AgentTemplateSeeder {
 
     public static final String UUID_CONCIERGE       = "agent-tpl-concierge-001";
     public static final String UUID_COMPUTER_ADMIN  = "agent-tpl-computer-admin-001";
+    public static final String UUID_VORK_DEVELOPER  = "agent-tpl-vork-developer-001";
 
     // -------------------------------------------------------------------------
 
@@ -63,7 +64,9 @@ and a retry with different instructions would help.
             """,
             List.of(
                     "listAgentTemplates",
-                    "listAvailableTools"
+                    "listAvailableTools",
+                    "listNotificationProviders",
+                    "sendNotification"
             ),
             true
     );
@@ -82,9 +85,6 @@ and a retry with different instructions would help.
             or step-by-step progress updates to the user thread unless explicitly requested by the \
             instructions. Keep your textual updates concise and focused strictly on the final \
             high-level outcome.
-            3. HOUSECLEANING: You must maintain a clean operational footprint. When your task is \
-            complete, you are strictly required to invoke `disconnectSsh` on any network endpoints \
-            or nodes you initialized during this session before yielding control.
 
             ### SYSTEM DISCOVERY & CREDENTIAL LIFECYCLE:
             - If you need to act on a node, check `listSshConnections` first to see if an active \
@@ -137,6 +137,50 @@ and a retry with different instructions would help.
             true
     );
 
+    private static final AgentTemplate VORK_DEVELOPER = new AgentTemplate(
+            UUID_VORK_DEVELOPER,
+            "Vork Developer",
+            """
+ You are the Vork Developer, an expert data-modelling and runtime-type engineering agent. \
+ Your role is to design, compile, persist, and manage Java record types and their stored \
+ instances entirely through the Vork TypeGen system.
+
+### CORE RESPONSIBILITIES
+- Understand what the user wants to model and translate it into clean Java record(s) with \
+ appropriate field names and types.
+- Always place generated types in the package {@code sh.vork.generated}.
+- After compiling a type with `compileJavaType`, immediately confirm it loaded successfully \
+ and describe its fields back to the user.
+- Use `getTypeSchema` before saving instances so you always know the exact field names and \
+ types expected.
+- Use `searchTypeInstances` to answer queries about stored data rather than listing everything \
+ and filtering manually.
+
+### DESIGN RULES
+- Record fields must use Jackson-serialisable types: primitives, String, BigDecimal, \
+ List<T>, Map<String, V>, or nested records.
+- Every record must declare a `String uuid` field (used as the MongoDB _id).
+- Nested value objects do NOT need to implement DatabaseEntity.
+- Keep records flat unless nesting genuinely models the domain better.
+
+### DELEGATION CONSTRAINTS
+You are a leaf agent. NEVER use DELEGATE_TURN. Valid status values are \
+FINISHED_TURN, CONTINUE_TURN, and SWITCH_AGENT.
+            """,
+            List.of(
+                    "compileJavaType",
+                    "listJavaTypes",
+                    "getTypeSchema",
+                    "saveTypeInstance",
+                    "listTypeInstances",
+                    "searchTypeInstances",
+                    "deleteTypeInstance",
+                    "listEnumValues",
+                    "listAvailableTools"
+            ),
+            true
+    );
+
     // -------------------------------------------------------------------------
 
     private final DatabaseRepository<AgentTemplate> agentTemplateRepository;
@@ -151,6 +195,7 @@ and a retry with different instructions would help.
 
         seedOrUpdate(CONCIERGE);
         seedOrUpdate(COMPUTER_ADMIN);
+        seedOrUpdate(VORK_DEVELOPER);
 
         log.info("EXIT AgentTemplateSeeder.onReady: built-in agent template seed complete");
     }

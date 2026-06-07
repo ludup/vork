@@ -2,6 +2,7 @@ package sh.vork.ai.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -93,6 +94,20 @@ public class AgentController {
 
         String err = validate(req);
         if (err != null) return ResponseEntity.badRequest().body(Map.of("error", err));
+
+        if (existing.systemAgent()) {
+            boolean instructionsChanged = !Objects.equals(
+                    req.systemPrompt() != null ? req.systemPrompt() : "",
+                    existing.systemPrompt());
+            boolean toolsChanged = req.allowedTools() != null
+                    && !req.allowedTools().equals(existing.allowedTools());
+            if (instructionsChanged || toolsChanged) {
+                log.warn("Refused to update instructions/tools of system agent [id={}]", id);
+                return ResponseEntity.status(403).body(Map.of(
+                        "error", "System agent instructions and tools are managed by the seeder "
+                               + "and cannot be edited here. Update the code and restart to apply changes."));
+            }
+        }
 
         AgentTemplate updated = new AgentTemplate(
                 id,

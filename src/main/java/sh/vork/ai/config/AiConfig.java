@@ -77,6 +77,9 @@ import sh.vork.ai.tool.ListSshConnectionsTool;
 import sh.vork.ai.tool.SetSshAliasTool;
 import sh.vork.ai.tool.SshConnectTool;
 import sh.vork.ai.tool.UploadFileTool;
+import sh.vork.ai.function.ListNotificationProvidersRequest;
+import sh.vork.ai.function.SendNotificationRequest;
+import sh.vork.notification.service.DirectNotificationService;
 
 /**
  * Wires all AI-related Spring beans.
@@ -390,17 +393,19 @@ public class AiConfig {
     @Restricted
     @ToolCategory("SSH & File Transfer")
     public ToolCallback connectSsh(SshConnectTool sshConnectTool) {
-        return FunctionToolCallback
+        ToolCallback delegate = FunctionToolCallback
                 .builder("connectSsh", sshConnectTool::execute)
                 .description("""
                     Establish an SSH connection to a remote host and start an interactive shell session. \
                     REASONING_HINT: Include the host and alias in the authorization reasoning. \
                     Invoke this tool when the user says 'ssh <host>', 'connect <host>', or asks to connect to a server. \
-                    The host may be specified as user@host:port, user@host, host:port, or just host. \
+                    The host may be specified as user@host:port, user@host, host:port, or just host — the user@ prefix is an SSH login username, never a friendly label. \
+                    ALIAS_HINT: when the user says 'connect to X as Y' or 'call it Y', Y is a friendly alias for the connection — put Y in the 'alias' field and leave the username out of 'host' unless explicitly given. \
                     An optional alias can be provided to refer to the connection by a short name in subsequent tool calls."""
                         .stripIndent())
                 .inputType(SshConnectRequest.class)
                 .build();
+        return new VisualizableToolCallback(delegate, sshConnectTool::formatAuthorizationDetails);
     }
 
     @Bean
@@ -591,6 +596,8 @@ Returns the fully-qualified class name on success.
 If a type implements com.jadaptive.orm.DatabaseEntity, uuid must be String (String uuid(); and field/component type String), never java.util.UUID. 
 Any record should implement com.jadaptive.orm.DatabaseEntity. 
 All types should use a sub-package of sh.vork.generated.
+When generating a record that will be managed in the Data Inspector UI, annotate record components with @sh.vork.typegen.DisplayField to control table columns and form rendering. Example: @DisplayField(label="Full Name", order=1, tableColumn=true, inputType="text", required=true). Fields not annotated with tableColumn=true will not appear in the table but will still appear in the create/edit form. Use tableColumn=false for nested records, long text, and list fields.
+Embedded value-object types (e.g. Address, LineItem) that are only used as nested fields inside a parent record MUST NOT implement DatabaseEntity and MUST NOT have a uuid field. Only top-level records that are stored and queried independently should implement DatabaseEntity. This distinction controls which types appear in the Data Inspector dropdown.
 REASONING_HINT: Authorization is required to compile {{type_name}}.
                                 """
                                 .stripIndent())
@@ -605,7 +612,7 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
                 if (sourceCode == null || sourceCode.isBlank()) {
                     return argumentsJson;
                 }
-                return "```java\n" + sourceCode + "\n```";
+                return sourceCode;
             } catch (Exception ex) {
                 return argumentsJson;
             }
@@ -901,6 +908,86 @@ REASONING_HINT: Authorization is required to compile {{type_name}}.
             return "{\"type\":\"array\",\"items\":" + itemSchema + "}";
         }
         return buildSchema(type);
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+
+    /**
+     * {@code listNotificationProviders} tool — discovers configured notification
+     * providers that support sending to arbitrary (unregistered) addresses.
+     *
+     * <p>The AI should call this before {@code sendNotification} to determine which
+     * providers are available and what address types each one accepts.
+     */
+    @Bean
+    @ToolCategory("Notifications")
+    public ToolCallback listNotificationProviders(DirectNotificationService directNotificationService) {
+        return FunctionToolCallback
+                .builder("listNotificationProviders",
+                        (ListNotificationProvidersRequest req) -> {
+                            log.debug("Tool listNotificationProviders invoked");
+                            try {
+                                var providers = directNotificationService.listAvailable();
+                                return objectMapper.writeValueAsString(providers);
+                            } catch (Exception e) {
+                                return "{\"status\":\"error\",\"message\":\""
+                                        + e.getMessage().replace("\"", "'") + "\"}";
+                            }
+                        })
+                .description(
+                        "List all configured notification providers that can send to arbitrary "
+                        + "addresses (email, SMS). Returns each provider's configId, displayName, "
+                        + "providerKey, and supported mediaTypes (EMAIL_ADDRESS, PHONE_NUMBER). "
+                        + "Call this before sendNotification to choose the right provider.")
+                .inputType(ListNotificationProvidersRequest.class)
+                .build();
+    }
+
+    /**
+     * {@code sendNotification} tool — sends a notification to an arbitrary address
+     * using a specific configured provider.
+     *
+     * <p>Requires prior approval ({@link Restricted}) because it delivers messages
+     * to external addresses.
+     */
+    @Bean
+    @Restricted
+    @ToolCategory("Notifications")
+    public ToolCallback sendNotification(DirectNotificationService directNotificationService) {
+        ToolCallback delegate = FunctionToolCallback
+                .builder("sendNotification",
+                        (SendNotificationRequest req) -> {
+                            log.debug("Tool sendNotification invoked: providerConfigId={}, address={}",
+                                    req.providerConfigId(), req.address());
+                            String result = directNotificationService.send(
+                                    req.providerConfigId(), req.title(), req.body(), req.address());
+                            if ("ok".equals(result)) {
+                                return "{\"status\":\"ok\"}";
+                            }
+                            return "{\"status\":\"error\",\"message\":\""
+                                    + result.replace("\"", "'") + "\"}";
+                        })
+                .description(
+                        "Send a notification to an arbitrary email address or phone number. "
+                        + "Call listNotificationProviders first to get a valid providerConfigId "
+                        + "and confirm the address type is supported. "
+                        + "address must match the provider type: email address for email providers, "
+                        + "E.164 phone number (e.g. +14155552671) for SMS providers.")
+                .inputType(SendNotificationRequest.class)
+                .build();
+        return new VisualizableToolCallback(delegate, argumentsJson -> {
+            try {
+                com.fasterxml.jackson.databind.JsonNode node =
+                        new com.fasterxml.jackson.databind.ObjectMapper().readTree(argumentsJson);
+                String providerConfigId = node.path("providerConfigId").asText(null);
+                String to      = node.path("address").asText("(unknown)");
+                String subject = node.path("title").asText("(no subject)");
+                String body    = node.path("body").asText("");
+                return directNotificationService.formatDirectNotification(providerConfigId, to, subject, body);
+            } catch (Exception ex) {
+                return argumentsJson;
+            }
+        });
     }
 
     private static String resolveSessionUuid() {

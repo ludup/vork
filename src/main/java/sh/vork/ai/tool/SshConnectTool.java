@@ -1,16 +1,20 @@
-package sh.vork.ai.tool;
+  package sh.vork.ai.tool;
 
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import sh.vork.ai.exception.ToolSuspensionException;
 import sh.vork.ai.function.SshConnectRequest;
+import sh.vork.ai.security.VisualizableTool;
 import sh.vork.ssh.VirtualSshService;
 
 @Component
-public class SshConnectTool {
+public class SshConnectTool implements VisualizableTool {
 
     private final VirtualSshService virtualSshService;
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     public SshConnectTool(VirtualSshService virtualSshService) {
         this.virtualSshService = virtualSshService;
@@ -39,5 +43,20 @@ public class SshConnectTool {
             throw new IllegalStateException("No sessionUuid available in execution context");
         }
         return sessionUuid;
+    }
+
+    @Override
+    public String formatAuthorizationDetails(String argumentsJson) {
+        try {
+                String host = objectMapper.readTree(argumentsJson)
+                        .path("host")
+                        .asText();
+                if (host == null || host.isBlank()) {
+                    return argumentsJson;
+                }
+                return host;
+            } catch (Exception ex) {
+                return argumentsJson;
+            }
     }
 }

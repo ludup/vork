@@ -22,6 +22,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import com.jadaptive.orm.DatabaseRepository;
+import com.jadaptive.orm.SearchQuery;
+import com.jadaptive.orm.SortOrder;
+import com.sshtools.client.ClientAuthenticator;
 import com.sshtools.client.KeyPairAuthenticator;
 import com.sshtools.client.PasswordAuthenticator;
 import com.sshtools.client.SshClient;
@@ -60,9 +64,6 @@ import sh.vork.ai.protocol.interaction.FieldSource;
 import sh.vork.ai.protocol.interaction.FormAction;
 import sh.vork.ai.protocol.interaction.FormField;
 import sh.vork.ai.protocol.interaction.InteractionFormSchema;
-import com.jadaptive.orm.DatabaseRepository;
-import com.jadaptive.orm.SearchQuery;
-import com.jadaptive.orm.SortOrder;
 import sh.vork.security.SecureCredentialStore;
 import sh.vork.security.VorkUser;
 
@@ -254,6 +255,10 @@ public class VirtualSshService extends AbstractSshServer {
 	}
 
 	public SshClient connectClient(String username, String host, int timeout) throws IOException, SshException, InterruptedException {
+		return connectClient(username, host, timeout, 0);
+	}
+	
+	private SshClient connectClient(String username, String host, int timeout, int attempts) throws IOException, SshException, InterruptedException {
 
 		if (host == null || host.isBlank()) {
 			throw new IllegalArgumentException("SSH host is required");
@@ -282,28 +287,27 @@ public class VirtualSshService extends AbstractSshServer {
 		SshClientContext context = new SshClientContext();
 		context.setUsername(normalizedUser);
 		
+		List<ClientAuthenticator> authenticators = new ArrayList<>();
 		String password = credentialStore.getSecret(principal, passwordSecretKey);	
 		if(password != null) {
-			 context.addAuthenticator(PasswordAuthenticator.forPassword(password));
+			 authenticators.add(PasswordAuthenticator.forPassword(password));
 		}
 
 		String key = credentialStore.getSecret(principal, keySecretKey);
 		String passphrase = credentialStore.getSecret(principal, passphraseSecretKey);
-		boolean hasUsableAuth = password != null && !password.isBlank();
 
 		if(key != null && !key.isBlank()) {
 			try {
 				SshKeyPair keyPair = SshKeyUtils.getPrivateKey(key, passphrase);
-				context.addAuthenticator(new KeyPairAuthenticator(keyPair));
-				hasUsableAuth = true;
+				authenticators.add(new KeyPairAuthenticator(keyPair));
 			} catch (IOException e) { 
-				if (!hasUsableAuth) {
+				if (authenticators.isEmpty()) {
 					throw credentialsPrompt(node,
 							"The stored private key is invalid. Provide a valid SSH private key or password.",
 							false);
 				}
 			} catch(InvalidPassphraseException e) {
-				if (!hasUsableAuth) {
+				if (authenticators.isEmpty()) {
 					throw credentialsPrompt(node,
 							"The private key requires a valid passphrase. Provide the key passphrase (or password instead).",
 							true);
@@ -311,7 +315,7 @@ public class VirtualSshService extends AbstractSshServer {
 			}
 		}
 
-		if(!hasUsableAuth || context.getAuthenticators().isEmpty()) {
+		if(authenticators.isEmpty()) {
 			throw credentialsPrompt(node,
 					"No stored SSH credentials were found for this user/host. Provide a password and/or private key.",
 					false);
@@ -329,29 +333,46 @@ public class VirtualSshService extends AbstractSshServer {
 			}
 		});
 
-	        SshClient client;
-	        try {
-	        	client = SshClientBuilder.create()
-	        		.withTarget(normalizedHost, port)
-	        		.withUsername(normalizedUser)
-	        		.withSshContext(context)
-	        		.withConnectTimeout(Duration.ofSeconds(timeout))
-	        		.build();
-	        } catch (IOException | SshException ex) {
-	        	throw credentialsPrompt(node,
-	        			"Stored credentials could not authenticate to the remote host. Provide updated password and/or key credentials.",
-	        			false);
-	        }
-	        SshConnection con = client.getConnection();
-	        con.getAuthenticatedFuture().waitFor(Duration.ofSeconds(timeout));
+		SshClient client;
+		
+		client = SshClientBuilder.create()
+			.withTarget(normalizedHost, port)
+			.withUsername(normalizedUser)
+			.withSshContext(context)
+			.withConnectTimeout(Duration.ofSeconds(timeout))
+			.build();
 
-		if(con.getAuthenticatedFuture().isSuccess() && con.getAuthenticatedFuture().isDone()) {
-			return client;
-		} else {
-			throw credentialsPrompt(node,
-					"SSH authentication failed. Provide valid password and/or private key credentials.",
-					false);
-		}
+			client.getConnection().getConnectFuture().waitFor(Duration.ofSeconds(timeout));
+			if(client.getConnection().getConnectFuture().isDoneAndSuccess()) {
+				log.info("SSH connection established to {}@{}:{}", normalizedUser, normalizedHost, port);
+			} else {
+				throw new IOException("Failed to connect to " + normalizedHost + " within timeout period " + timeout + " seconds");
+			}
+
+			/**
+			 * Authenticate
+			 */
+			for (ClientAuthenticator a : authenticators) {
+				if(!client.authenticate(a, Duration.ofSeconds(timeout).toMillis())) {
+					// Remove the failed credential so the next attempt prompts for fresh input.
+					if (a instanceof PasswordAuthenticator) {
+						credentialStore.deleteSecret(principal, passwordSecretKey);
+						log.warn("Removed failed SSH password credential [node={}]", node.uuid());
+					} else if (a instanceof KeyPairAuthenticator) {
+						credentialStore.deleteSecret(principal, keySecretKey);
+						credentialStore.deleteSecret(principal, passphraseSecretKey);
+						log.warn("Removed failed SSH key/passphrase credentials [node={}]", node.uuid());
+					}
+				
+					continue;
+				}
+				if(client.isAuthenticated()) {
+					return client;
+				}
+			}
+
+			throw new IOException("Failed to authenticate to " + host + " with provided credentials");
+		
 	}
 
 	private int extractPort(String normalizedHost) {
@@ -488,11 +509,13 @@ public class VirtualSshService extends AbstractSshServer {
         }
 
         private SshPublicKey getHostKey(String host, int port, int timeout) throws IOException, SshException {
-                return SshClientBuilder.create()
-                                .withTarget(host, port)
-                                .withUsername("guest")
-                                .withConnectTimeout(Duration.ofSeconds(timeout))
-                                .build().getHostKey();
+                try(SshClient client = SshClientBuilder.create()
+					.withTarget(host, port)
+					.withUsername("guest")
+					.withConnectTimeout(Duration.ofSeconds(timeout))
+					.build()) {
+						return client.getHostKey();
+				}
         }
 	private ToolSuspensionException credentialsPrompt(VorkNode node,
 											 String description,

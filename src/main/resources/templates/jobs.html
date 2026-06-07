@@ -245,6 +245,14 @@
                             <option value="">— none (use global default) —</option>
                         </select>
                     </div>
+
+                    <!-- OOB Timeout -->
+                    <div class="col-md-6">
+                        <label class="form-label" for="job-oob-timeout">OOB Auth Timeout (minutes)</label>
+                        <input type="number" id="job-oob-timeout" class="form-control" min="1" value="240"
+                               placeholder="240">
+                        <div class="form-text">How long the relay authorization link remains valid. Default: 240 min (4 hrs).</div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -321,6 +329,7 @@
         document.getElementById('job-duration-type').value = 'HOURS';
         document.getElementById('job-agent').value = '';
         document.getElementById('job-model').value = '';
+        document.getElementById('job-oob-timeout').value = 240;
         document.querySelectorAll('input[name="invocationType"]').forEach(function (r) { r.checked = false; });
         onTypeChange();
         jobModal.show();
@@ -349,6 +358,7 @@
         }
         document.getElementById('job-repeat-duration').value = job.repeatDuration || 1;
         document.getElementById('job-duration-type').value = job.durationType || 'HOURS';
+        document.getElementById('job-oob-timeout').value = job.oobTimeoutMinutes > 0 ? job.oobTimeoutMinutes : 240;
 
         jobModal.show();
     }
@@ -387,7 +397,8 @@
             durationType:     document.getElementById('job-duration-type').value,
             agentTemplateId:  document.getElementById('job-agent').value || null,
             provider:         provider,
-            modelId:          modelId
+            modelId:          modelId,
+            oobTimeoutMinutes: parseInt(document.getElementById('job-oob-timeout').value) || 240
         };
 
         var btn = document.getElementById('btn-save-job');

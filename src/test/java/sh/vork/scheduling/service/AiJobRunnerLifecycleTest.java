@@ -15,6 +15,7 @@ import sh.vork.ai.entity.AiSessionStatus;
 import sh.vork.ai.entity.SessionOriginMode;
 import com.jadaptive.orm.mock.MapDatabaseRepository;
 import sh.vork.scheduling.domain.DurationType;
+import sh.vork.scheduling.domain.InvocationType;
 import sh.vork.scheduling.domain.ScheduledJob;
 import sh.vork.scheduling.domain.ScheduledJobStatus;
 
@@ -36,10 +37,13 @@ class AiJobRunnerLifecycleTest {
                 "Fetch and summarize",
                 "source-session",
                 "alice",
+                InvocationType.ONE_TIME,
                 Instant.parse("2026-05-17T18:10:00Z"),
                 0,
                 DurationType.MINUTES,
-                ScheduledJobStatus.ACTIVE);
+                0L, 0L, null, null, null,
+                0,
+                ScheduledJobStatus.WAITING);
 
         jobRepo.save(job);
 
@@ -49,7 +53,7 @@ class AiJobRunnerLifecycleTest {
         runner.run();
 
         ScheduledJob saved = jobRepo.get("job-life-1");
-        assertEquals(ScheduledJobStatus.COMPLETED, saved.status());
+        assertEquals(ScheduledJobStatus.WAITING, saved.status());
     }
 
     @Test
@@ -63,10 +67,13 @@ class AiJobRunnerLifecycleTest {
                 "Fetch and summarize",
                 "source-session",
                 "alice",
+                InvocationType.ONE_TIME,
                 Instant.parse("2026-05-17T18:10:00Z"),
                 0,
                 DurationType.MINUTES,
-                ScheduledJobStatus.ACTIVE);
+                0L, 0L, null, null, null,
+                0,
+                ScheduledJobStatus.WAITING);
 
         jobRepo.save(job);
 
@@ -76,7 +83,7 @@ class AiJobRunnerLifecycleTest {
         runner.run();
 
         ScheduledJob saved = jobRepo.get("job-life-2");
-        assertEquals(ScheduledJobStatus.PAUSED, saved.status());
+        assertEquals(ScheduledJobStatus.AWAITING_INPUT, saved.status());
     }
 
     private static final class CompletingEngine extends BackgroundOrchestrationEngine {
@@ -85,7 +92,7 @@ class AiJobRunnerLifecycleTest {
         private final AiSessionStatus targetStatus;
 
         private CompletingEngine(MapDatabaseRepository<AiSession> sessionRepo, AiSessionStatus targetStatus) {
-            super(null, null, new BackgroundExecutionContext());
+            super(null, null, new BackgroundExecutionContext(), null, null);
             this.sessionRepo = sessionRepo;
             this.targetStatus = targetStatus;
         }

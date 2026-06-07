@@ -17,6 +17,8 @@ import sh.vork.notification.NotificationMediaType;
  * @param address     the actual address: email, E.164 phone, Telegram handle/ID
  * @param label       optional friendly label (e.g. "Work email")
  * @param isDefault   {@code true} when this is the user's preferred delivery address
+ * @param oobEnabled  {@code true} when this address receives out-of-band background-session
+ *                    authorization requests
  * @param createdAt   epoch-millis creation timestamp
  */
 public record UserNotificationMedia(
@@ -27,5 +29,6 @@ public record UserNotificationMedia(
         String               address,
         String               label,
         boolean              isDefault,
+        boolean              oobEnabled,
         long                 createdAt
 ) implements DatabaseEntity {}

@@ -27,6 +27,7 @@ public record ScheduledJob(
         String agentTemplateId,        // optional — pinned agent template UUID
         String provider,               // optional — AiProvider name override
         String modelId,                // optional — model ID override
+        int oobTimeoutMinutes,         // minutes before the OOB relay auth link expires; 0 = use system default
         ScheduledJobStatus status
 ) implements DatabaseEntity {
 

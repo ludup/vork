@@ -33,7 +33,7 @@ class BackgroundOrchestrationEngineTest {
         MapDatabaseRepository<AiSession> sessionRepo = new MapDatabaseRepository<>(AiSession.class);
         BackgroundExecutionContext context = new BackgroundExecutionContext();
         TestChatService chatService = new TestChatService(sessionRepo, context, Mode.NO_OP);
-        BackgroundOrchestrationEngine engine = new BackgroundOrchestrationEngine(chatService, sessionRepo, context);
+        BackgroundOrchestrationEngine engine = new BackgroundOrchestrationEngine(chatService, sessionRepo, context, null, null);
 
         String sessionUuid = "bg-max";
         sessionRepo.save(new AiSession(
@@ -63,7 +63,7 @@ class BackgroundOrchestrationEngineTest {
         MapDatabaseRepository<AiSession> sessionRepo = new MapDatabaseRepository<>(AiSession.class);
         BackgroundExecutionContext context = new BackgroundExecutionContext();
         TestChatService chatService = new TestChatService(sessionRepo, context, Mode.MARK_COMPLETE);
-        BackgroundOrchestrationEngine engine = new BackgroundOrchestrationEngine(chatService, sessionRepo, context);
+        BackgroundOrchestrationEngine engine = new BackgroundOrchestrationEngine(chatService, sessionRepo, context, null, null);
 
         String sessionUuid = "bg-complete";
         sessionRepo.save(new AiSession(
@@ -92,7 +92,7 @@ class BackgroundOrchestrationEngineTest {
         MapDatabaseRepository<AiSession> sessionRepo = new MapDatabaseRepository<>(AiSession.class);
         BackgroundExecutionContext context = new BackgroundExecutionContext();
         TestChatService chatService = new TestChatService(sessionRepo, context, Mode.THROW_SUSPENSION);
-        BackgroundOrchestrationEngine engine = new BackgroundOrchestrationEngine(chatService, sessionRepo, context);
+        BackgroundOrchestrationEngine engine = new BackgroundOrchestrationEngine(chatService, sessionRepo, context, null, null);
 
         String sessionUuid = "bg-suspend";
         sessionRepo.save(new AiSession(
@@ -134,7 +134,7 @@ class BackgroundOrchestrationEngineTest {
             super(
                     sessionRepo,
                     null,
-                    new AiOrchestrationService(Map.of(), null, null, null, null, Map.of()),
+                    new AiOrchestrationService(Map.of(), null, null, null, null, Map.of(), null),
                     null,
                     new SimpMessagingTemplate(new NoOpMessageChannel()),
                     new ObjectMapper().findAndRegisterModules(),

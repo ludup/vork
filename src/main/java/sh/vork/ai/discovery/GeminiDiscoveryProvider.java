@@ -54,7 +54,6 @@ public class GeminiDiscoveryProvider implements ModelDiscoveryProvider {
         return (String) m.get("name");
     }
 
-    @SuppressWarnings("unchecked")
     private static boolean supportsGenerateContent(Map<String, Object> m) {
         Object methods = m.get("supportedGenerationMethods");
         if (!(methods instanceof List<?> list)) return false;

@@ -47,13 +47,16 @@ public class TelegramPollingService {
     private final DatabaseRepository<NotificationProviderConfig> configRepo;
     private final List<TelegramMessageConsumer> consumers;
     private final ObjectMapper objectMapper;
+    private final TelegramApiClient telegramApiClient;
 
     public TelegramPollingService(DatabaseRepository<NotificationProviderConfig> configRepo,
                                    List<TelegramMessageConsumer> consumers,
-                                   ObjectMapper objectMapper) {
-        this.configRepo   = configRepo;
-        this.consumers    = consumers;
-        this.objectMapper = objectMapper;
+                                   ObjectMapper objectMapper,
+                                   TelegramApiClient telegramApiClient) {
+        this.configRepo         = configRepo;
+        this.consumers          = consumers;
+        this.objectMapper       = objectMapper;
+        this.telegramApiClient  = telegramApiClient;
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -149,9 +152,38 @@ public class TelegramPollingService {
             if (!results.isArray() || results.isEmpty()) return;
 
             for (JsonNode upd : results) {
-                int updateId    = upd.path("update_id").asInt();
+                int updateId = upd.path("update_id").asInt();
+
+                // ── callback_query (inline keyboard button press) ──────────────
+                JsonNode cbNode = upd.path("callback_query");
+                if (!cbNode.isMissingNode() && !cbNode.isNull()) {
+                    String callbackQueryId = cbNode.path("id").asText();
+                    String callbackData    = cbNode.path("data").asText(null);
+                    JsonNode cbFrom        = cbNode.path("from");
+                    JsonNode cbMsg         = cbNode.path("message");
+                    String chatId          = cbMsg.path("chat").path("id").asText(
+                                                cbFrom.path("id").asText(""));
+                    String firstName       = cbFrom.path("first_name").asText("");
+                    String username        = cbFrom.path("username").asText("");
+
+                    // Acknowledge immediately to clear loading state
+                    telegramApiClient.answerCallbackQuery(botToken, callbackQueryId, null);
+
+                    TelegramMessageConsumer.IncomingMessage msg =
+                            new TelegramMessageConsumer.IncomingMessage(
+                                    configId, botToken, chatId, firstName, username,
+                                    null, updateId, callbackQueryId, callbackData);
+                    dispatch(msg);
+                    offset.accumulateAndGet(updateId + 1, Math::max);
+                    continue;
+                }
+
+                // ── regular text message ───────────────────────────────────────
                 JsonNode msgNode = upd.path("message");
-                if (msgNode.isMissingNode() || msgNode.isNull()) continue;
+                if (msgNode.isMissingNode() || msgNode.isNull()) {
+                    offset.accumulateAndGet(updateId + 1, Math::max);
+                    continue;
+                }
 
                 JsonNode fromNode = msgNode.path("from");
                 JsonNode chatNode = msgNode.path("chat");
@@ -165,22 +197,25 @@ public class TelegramPollingService {
 
                 TelegramMessageConsumer.IncomingMessage msg =
                         new TelegramMessageConsumer.IncomingMessage(
-                                configId, botToken, chatId, firstName, username, text, updateId);
-
-                for (TelegramMessageConsumer consumer : consumers) {
-                    try {
-                        if (consumer.accepts(msg)) consumer.process(msg);
-                    } catch (Exception e) {
-                        log.warn("Consumer error [consumer={}, error={}]",
-                                consumer.getClass().getSimpleName(), e.getMessage());
-                    }
-                }
-
-                // Advance offset past this update
+                                configId, botToken, chatId, firstName, username,
+                                text, updateId, null, null);
+                dispatch(msg);
                 offset.accumulateAndGet(updateId + 1, Math::max);
             }
         } catch (Exception e) {
             log.warn("Failed to parse Telegram updates [error={}]", e.getMessage());
         }
     }
+
+    private void dispatch(TelegramMessageConsumer.IncomingMessage msg) {
+        for (TelegramMessageConsumer consumer : consumers) {
+            try {
+                if (consumer.accepts(msg)) consumer.process(msg);
+            } catch (Exception e) {
+                log.warn("Consumer error [consumer={}, error={}]",
+                        consumer.getClass().getSimpleName(), e.getMessage());
+            }
+        }
+    }
 }
+

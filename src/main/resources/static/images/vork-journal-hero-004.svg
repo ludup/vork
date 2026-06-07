@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" width="900" height="340">
+  <defs>
+    <linearGradient id="bg4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0e1a"/>
+      <stop offset="100%" style="stop-color:#0d1f3c"/>
+    </linearGradient>
+    <linearGradient id="pulse4" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a6fff;stop-opacity:0"/>
+      <stop offset="50%" style="stop-color:#4db8ff;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1a6fff;stop-opacity:0"/>
+    </linearGradient>
+    <filter id="glow4">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="340" fill="url(#bg4)"/>
+
+  <!-- Grid lines -->
+  <g stroke="#1a2a4a" stroke-width="0.5" opacity="0.4">
+    <line x1="0" y1="68" x2="900" y2="68"/>
+    <line x1="0" y1="136" x2="900" y2="136"/>
+    <line x1="0" y1="204" x2="900" y2="204"/>
+    <line x1="0" y1="272" x2="900" y2="272"/>
+    <line x1="180" y1="0" x2="180" y2="340"/>
+    <line x1="360" y1="0" x2="360" y2="340"/>
+    <line x1="540" y1="0" x2="540" y2="340"/>
+    <line x1="720" y1="0" x2="720" y2="340"/>
+  </g>
+
+  <!-- Central transmitter tower -->
+  <g filter="url(#glow4)">
+    <!-- Tower base -->
+    <polygon points="420,280 480,280 465,160 435,160" fill="none" stroke="#2a5fff" stroke-width="1.5"/>
+    <line x1="435" y1="200" x2="465" y2="200" stroke="#2a5fff" stroke-width="1" opacity="0.7"/>
+    <line x1="437" y1="230" x2="463" y2="230" stroke="#2a5fff" stroke-width="1" opacity="0.7"/>
+    <!-- Mast -->
+    <line x1="450" y1="160" x2="450" y2="100" stroke="#4db8ff" stroke-width="2"/>
+    <!-- Signal origin dot -->
+    <circle cx="450" cy="100" r="5" fill="#4db8ff"/>
+    <circle cx="450" cy="100" r="9" fill="none" stroke="#4db8ff" stroke-width="1" opacity="0.5"/>
+  </g>
+
+  <!-- Broadcast arcs emanating from tower tip -->
+  <g fill="none" filter="url(#softglow)">
+    <path d="M 420,95 A 35,35 0 0,1 480,95" stroke="#4db8ff" stroke-width="1.5" opacity="0.8"/>
+    <path d="M 400,80 A 55,55 0 0,1 500,80" stroke="#4db8ff" stroke-width="1" opacity="0.6"/>
+    <path d="M 378,62 A 78,78 0 0,1 522,62" stroke="#4db8ff" stroke-width="0.8" opacity="0.4"/>
+    <path d="M 355,42 A 102,102 0 0,1 545,42" stroke="#4db8ff" stroke-width="0.6" opacity="0.25"/>
+    <path d="M 328,18 A 130,130 0 0,1 572,18" stroke="#4db8ff" stroke-width="0.5" opacity="0.15"/>
+  </g>
+
+  <!-- Left cluster — email node -->
+  <g filter="url(#glow4)">
+    <!-- Wire from tower to email node -->
+    <path d="M 440,200 C 350,200 280,200 220,170" stroke="#2a5fff" stroke-width="1" fill="none" opacity="0.5" stroke-dasharray="4,3"/>
+    <!-- Email icon circle -->
+    <circle cx="190" cy="165" r="28" fill="#0d1f3c" stroke="#2a5fff" stroke-width="1.5"/>
+    <!-- Envelope -->
+    <rect x="175" y="155" width="30" height="20" rx="2" fill="none" stroke="#4db8ff" stroke-width="1.2"/>
+    <polyline points="175,155 190,165 205,155" fill="none" stroke="#4db8ff" stroke-width="1.2"/>
+    <!-- Notification badge -->
+    <circle cx="212" cy="147" r="8" fill="#ff4466"/>
+    <text x="212" y="151" text-anchor="middle" font-size="9" fill="white" font-family="monospace">✓</text>
+  </g>
+
+  <!-- Right cluster — SMS node -->
+  <g filter="url(#glow4)">
+    <path d="M 460,200 C 550,200 620,200 680,170" stroke="#2a5fff" stroke-width="1" fill="none" opacity="0.5" stroke-dasharray="4,3"/>
+    <circle cx="710" cy="165" r="28" fill="#0d1f3c" stroke="#2a5fff" stroke-width="1.5"/>
+    <!-- Phone icon -->
+    <rect x="699" y="151" width="22" height="28" rx="3" fill="none" stroke="#4db8ff" stroke-width="1.2"/>
+    <line x1="706" y1="174" x2="714" y2="174" stroke="#4db8ff" stroke-width="1.2"/>
+    <!-- Notification badge -->
+    <circle cx="726" cy="147" r="8" fill="#ff4466"/>
+    <text x="726" y="151" text-anchor="middle" font-size="8" fill="white" font-family="monospace">SMS</text>
+  </g>
+
+  <!-- Top left — lock/restricted node -->
+  <g filter="url(#glow4)">
+    <path d="M 440,150 C 360,120 300,100 250,100" stroke="#ff6633" stroke-width="1" fill="none" opacity="0.4" stroke-dasharray="3,3"/>
+    <circle cx="225" cy="98" r="22" fill="#0d1f3c" stroke="#ff6633" stroke-width="1.5"/>
+    <!-- Padlock -->
+    <rect x="215" y="100" width="20" height="14" rx="2" fill="none" stroke="#ff9955" stroke-width="1.2"/>
+    <path d="M 219,100 A 6,6 0 0,1 231,100" fill="none" stroke="#ff9955" stroke-width="1.2"/>
+    <circle cx="225" cy="107" r="2.5" fill="#ff9955"/>
+    <line x1="225" y1="109" x2="225" y2="112" stroke="#ff9955" stroke-width="1.2"/>
+    <text x="225" y="91" text-anchor="middle" font-size="7" fill="#ff9955" font-family="monospace">@RESTRICTED</text>
+  </g>
+
+  <!-- Top right — Telegram blocked node -->
+  <g filter="url(#glow4)">
+    <path d="M 460,150 C 540,120 600,100 650,100" stroke="#555577" stroke-width="1" fill="none" opacity="0.4" stroke-dasharray="3,3"/>
+    <circle cx="675" cy="98" r="22" fill="#0d1f3c" stroke="#445566" stroke-width="1.5"/>
+    <!-- Paper plane (telegram) with X -->
+    <polygon points="663,91 687,98 673,102 670,110" fill="none" stroke="#445566" stroke-width="1.2"/>
+    <line x1="670" y1="102" x2="676" y2="108" stroke="#445566" stroke-width="1.2"/>
+    <!-- X overlay -->
+    <line x1="663" y1="87" x2="687" y2="111" stroke="#ff4444" stroke-width="1.5" opacity="0.7"/>
+    <line x1="687" y1="87" x2="663" y2="111" stroke="#ff4444" stroke-width="1.5" opacity="0.7"/>
+    <text x="675" y="88" text-anchor="middle" font-size="7" fill="#445566" font-family="monospace">TELEGRAM</text>
+  </g>
+
+  <!-- Bottom discovery node -->
+  <g filter="url(#glow4)">
+    <path d="M 450,280 L 450,310" stroke="#2a5fff" stroke-width="1" opacity="0.5" stroke-dasharray="3,3"/>
+    <rect x="380" y="310" width="140" height="24" rx="4" fill="#0d1f3c" stroke="#2a5fff" stroke-width="1"/>
+    <text x="450" y="326" text-anchor="middle" font-size="9" fill="#4db8ff" font-family="monospace">listNotificationProviders()</text>
+  </g>
+
+  <!-- Floating data packets on wires (animated look) -->
+  <circle cx="320" cy="185" r="3" fill="#4db8ff" opacity="0.7"/>
+  <circle cx="350" cy="192" r="2" fill="#4db8ff" opacity="0.5"/>
+  <circle cx="590" cy="185" r="3" fill="#4db8ff" opacity="0.7"/>
+  <circle cx="560" cy="192" r="2" fill="#4db8ff" opacity="0.5"/>
+
+  <!-- Title text -->
+  <text x="450" y="50" text-anchor="middle" font-size="28" font-family="'Courier New', monospace" fill="#4db8ff" filter="url(#glow4)" font-weight="bold">VORK JOURNAL 004</text>
+  <text x="450" y="72" text-anchor="middle" font-size="12" font-family="'Courier New', monospace" fill="#7799cc" letter-spacing="4">DIRECT NOTIFICATION BROADCAST SYSTEM</text>
+
+  <!-- Scan line overlay -->
+  <rect width="900" height="340" fill="none" stroke="none" opacity="0.03"
+        style="background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px)"/>
+</svg>

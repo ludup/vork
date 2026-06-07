@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>General Settings — Vork</title>
+    <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
+    <link rel="stylesheet" href="/packages/npm/bootstrap/current/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="/packages/npm.fortawesome/fontawesome-free/current/css/all.min.css">
+    <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body>
+<div class="container py-5" style="max-width: 700px;">
+    <div th:replace="~{fragments/settings-navigation :: backToSettings}"></div>
+    <h2 class="mb-1"><i class="fa-solid fa-sliders me-2"></i>General</h2>
+    <p class="text-muted mb-4">Application base URL and system-wide defaults.</p>
+
+    <div id="alert-area"></div>
+
+    <div class="card mb-4 border-primary">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-globe text-primary"></i>
+            <span class="fw-semibold">Application Base URL</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                The public-facing base URL of this Vork instance (e.g. <code>https://my.vork.app</code>).
+                Used to generate authorization form links for out-of-band input.
+                Leave blank to use the secure Vork Relay <code>relay.vork.sh</code>
+                (see <a href="https://github.com/ludup/vork-relay" target="_blank">Vork Relay</a>
+                for full specification and code).
+            </p>
+            <label class="form-label" for="app-base-url">Base URL</label>
+            <input type="url" id="app-base-url" class="form-control mb-3"
+                   placeholder="https://my.vork.app" autocomplete="off">
+            <button class="btn btn-primary btn-sm" onclick="saveSettings()">
+                <i class="fa-solid fa-save me-1"></i>Save
+            </button>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-primary">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-bell text-primary"></i>
+            <span class="fw-semibold">Default OOB Authorization Timeout</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                How long the relay authorization link remains valid for Telegram and interactive
+                out-of-band requests. Background scheduled jobs use their own per-job timeout.
+                Default: 15 minutes.
+            </p>
+            <label class="form-label" for="oob-timeout">Timeout (minutes)</label>
+            <input type="number" id="oob-timeout" class="form-control mb-3"
+                   min="1" placeholder="15" autocomplete="off">
+            <button class="btn btn-primary btn-sm" onclick="saveSettings()">
+                <i class="fa-solid fa-save me-1"></i>Save
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const alertArea = document.getElementById('alert-area');
+
+    function showAlert(msg, type) {
+        alertArea.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${msg}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+    }
+
+    // Load current value on page load
+    fetch('/api/system/settings')
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('app-base-url').value = d.appBaseUrl || '';
+            document.getElementById('oob-timeout').value = d.defaultOobTimeoutMinutes || 15;
+        })
+        .catch(() => {});
+
+    function saveSettings() {
+        // Read current system settings first so we preserve provider/model
+        fetch('/api/system/settings')
+            .then(r => r.json())
+            .then(current => {
+                const payload = {
+                    defaultProvider:         current.defaultProvider || '',
+                    defaultModelId:          current.defaultModelId  || '',
+                    appBaseUrl:              document.getElementById('app-base-url').value.trim(),
+                    defaultOobTimeoutMinutes: parseInt(document.getElementById('oob-timeout').value) || 15
+                };
+                return fetch('/api/system/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            })
+            .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
+            .then(() => showAlert('Settings saved.', 'success'))
+            .catch(e => showAlert('Failed to save: ' + (e.error || e.message || 'unknown error'), 'danger'));
+    }
+</script>
+<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

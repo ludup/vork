@@ -7,7 +7,9 @@ package sh.vork.ai.security;
 public interface VisualizableTool {
 
     /**
-     * Formats raw tool arguments JSON into a clean markdown string for display.
+     * Extracts a plain-text summary of the tool arguments for display in authorization prompts.
+     * Consumers are responsible for applying any formatting (markdown fences, MarkdownV2, etc.)
+     * appropriate to their rendering context.
      */
     String formatAuthorizationDetails(String argumentsJson);
 }

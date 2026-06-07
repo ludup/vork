@@ -39,6 +39,7 @@ class AiSchedulerServiceResumeCompletionTest {
                 0L,
                 0L,
                 null, null, null,
+                0,
                 ScheduledJobStatus.AWAITING_INPUT));
 
         sessionRepo.save(new AiSession(
@@ -66,7 +67,7 @@ class AiSchedulerServiceResumeCompletionTest {
         private final MapDatabaseRepository<AiSession> sessionRepo;
 
         private CompletingEngine(MapDatabaseRepository<AiSession> sessionRepo) {
-            super(null, null, new BackgroundExecutionContext());
+            super(null, null, new BackgroundExecutionContext(), null, null);
             this.sessionRepo = sessionRepo;
         }
 

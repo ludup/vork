@@ -66,6 +66,16 @@ public class TelegramNotificationProvider implements NotificationProvider {
         return Set.of(NotificationMediaType.TELEGRAM);
     }
 
+    /**
+     * Telegram requires the recipient to have previously messaged the bot to
+     * obtain a chat ID — arbitrary addresses cannot be reached without prior
+     * opt-in.
+     */
+    @Override
+    public boolean supportsDirectAddress() {
+        return false;
+    }
+
     @Override
     public List<SettingDefinition> getSettingDefinitions() {
         return DEFINITIONS;

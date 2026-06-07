@@ -347,18 +347,31 @@ BACKGROUND OPERATIONAL PROTOCOL: You are executing autonomously in an isolated b
                 try {
                         return callFn.apply(buildMutatedClient(base));
                 } catch (RuntimeException e) {
-                        if (!isDeprecatedModelError(e)) throw e;
+                        if (!isModelCompatibilityError(e)) throw e;
                         String fallback = STABLE_FALLBACK_MODELS.getOrDefault(provider, "");
-                        log.warn("Model unavailable/deprecated for provider {}; retrying with fallback model \"{}\" (original error: {})",
-                                provider, fallback, e.getMessage());
+                        String reason = isThoughtSignatureError(e) ? "thought_signature not preserved (thinking model)"
+                                                                    : "model unavailable/deprecated";
+                        log.warn("Model fallback triggered for provider {} [reason={}, fallback=\"{}\", originalError={}]",
+                                provider, reason, fallback, e.getMessage());
                         if (fallback.isBlank()) throw e;
                         return callFn.apply(buildMutatedClientWithModel(base, fallback));
                 }
         }
 
+        private static boolean isModelCompatibilityError(RuntimeException e) {
+                return isDeprecatedModelError(e) || isThoughtSignatureError(e);
+        }
+
+        private static boolean isThoughtSignatureError(RuntimeException e) {
+                String msg = collectExceptionMessages(e);
+                return containsIgnoreCase(msg, "thought_signature");
+        }
+
         /** Returns {@code true} when the exception looks like a deprecated/removed-model error. */
         private static boolean isDeprecatedModelError(RuntimeException e) {
                 String msg = collectExceptionMessages(e);
+                // Exclude thought_signature 400s — those are a Spring AI compatibility issue, not deprecation.
+                if (containsIgnoreCase(msg, "thought_signature")) return false;
                 return msg.contains("404")
                         || msg.contains("400")
                         || containsIgnoreCase(msg, "no longer available")

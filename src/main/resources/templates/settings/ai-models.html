@@ -170,20 +170,28 @@
         const sep = val.indexOf(':');
         const provider = val.substring(0, sep);
         const modelId  = val.substring(sep + 1);
-        fetch('/api/system/settings', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ defaultProvider: provider, defaultModelId: modelId })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                showAlert('Global default saved: ' + val.replace(':', ' — '), 'success');
-            } else {
-                showAlert('Error: ' + (data.error || 'Unknown error'), 'danger');
-            }
-        })
-        .catch(() => showAlert('Network error saving global default.', 'danger'));
+        // Pre-read current settings to preserve appBaseUrl and defaultOobTimeoutMinutes
+        fetch('/api/system/settings')
+            .then(r => r.json())
+            .then(current => fetch('/api/system/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    defaultProvider:          provider,
+                    defaultModelId:           modelId,
+                    appBaseUrl:               current.appBaseUrl || '',
+                    defaultOobTimeoutMinutes: current.defaultOobTimeoutMinutes || 15
+                })
+            }))
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showAlert('Global default saved: ' + val.replace(':', ' — '), 'success');
+                } else {
+                    showAlert('Error: ' + (data.error || 'Unknown error'), 'danger');
+                }
+            })
+            .catch(() => showAlert('Network error saving global default.', 'danger'));
     }
 
     function toggleForm(providerKey) {

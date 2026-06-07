@@ -27,7 +27,7 @@ class SchedulerLifecycleManagerTest {
 
     private static ScheduledJob job(String id, InvocationType type, ScheduledJobStatus status) {
         return new ScheduledJob(id, "Job " + id, "p", "sid", "alice",
-                type, START, 10, DurationType.MINUTES, 0L, 0L, null, null, null, status);
+                type, START, 10, DurationType.MINUTES, 0L, 0L, null, null, null, 0, status);
     }
 
     @Test
