@@ -4,129 +4,163 @@
 
 (function () {
 
-    var loadingEl   = document.getElementById('loading-state');
-    var emptyEl     = document.getElementById('empty-state');
-    var containerEl = document.getElementById('sessions-container');
+    var loadingEl      = document.getElementById('loading-state');
+    var emptyEl        = document.getElementById('empty-state');
+    var tableWrapper   = document.getElementById('sessions-table-wrapper');
+    var tbody          = document.getElementById('sessions-tbody');
+    var modalEl        = document.getElementById('input-modal');
+    var modalLabel     = document.getElementById('input-modal-label');
+    var modalBody      = document.getElementById('input-modal-body');
+    var modalFooter    = document.getElementById('input-modal-footer');
 
-    // ── Bootstrap ──────────────────────────────────────────────────────────────
+    var bsModal   = new bootstrap.Modal(modalEl);
+    var sessions  = [];   // cached list from the API
+
+    // ── Load ──────────────────────────────────────────────────────────────────
 
     function load() {
         fetch('/api/chat/sessions/pending-input')
             .then(function (r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
-            .then(function (sessions) {
+            .then(function (data) {
                 loadingEl.classList.add('d-none');
-                if (!sessions || sessions.length === 0) {
+                sessions = data || [];
+                if (sessions.length === 0) {
                     emptyEl.classList.remove('d-none');
                     return;
                 }
-                sessions.forEach(function (s) { containerEl.appendChild(buildCard(s)); });
+                renderTable(sessions);
+                tableWrapper.classList.remove('d-none');
             })
             .catch(function (err) {
                 loadingEl.classList.add('d-none');
-                containerEl.innerHTML =
+                tableWrapper.innerHTML =
                     '<div class="alert alert-danger">Failed to load pending sessions: ' + escapeHtml(String(err)) + '</div>';
+                tableWrapper.classList.remove('d-none');
             });
     }
 
-    // ── Card builder ───────────────────────────────────────────────────────────
+    // ── Table ─────────────────────────────────────────────────────────────────
 
-    function buildCard(session) {
-        var card = document.createElement('div');
-        card.className = 'session-card';
-        card.id = 'card-' + session.sessionUuid;
+    function renderTable(list) {
+        tbody.innerHTML = '';
+        list.forEach(function (session) {
+            tbody.appendChild(buildRow(session));
+        });
+    }
 
-        // ── Header ──────────────────────────────────────────────────────────────
-        var header = document.createElement('div');
-        header.className = 'session-card-header';
+    function buildRow(session) {
+        var tr = document.createElement('tr');
+        tr.id = 'row-' + session.sessionUuid;
 
-        var left = document.createElement('div');
-        left.className = 'session-card-header-left';
+        // Session name
+        var tdName = document.createElement('td');
+        tdName.className = 'fw-semibold';
+        tdName.textContent = session.sessionName || 'Untitled';
+        tdName.title = session.sessionUuid;
+        tr.appendChild(tdName);
 
+        // Origin badge
+        var tdOrigin = document.createElement('td');
         var badge = document.createElement('span');
-        badge.className = 'session-origin-badge origin-' + (session.originMode || '');
-        badge.textContent = session.originMode === 'TELEGRAM'
-            ? '\u2708 Telegram'
-            : '\u25CE Background';
+        badge.className = 'origin-badge origin-' + (session.originMode || '');
+        badge.textContent = session.originMode === 'TELEGRAM' ? '\u2708 Telegram' : '\u25CE Background';
+        tdOrigin.appendChild(badge);
+        tr.appendChild(tdOrigin);
 
-        var name = document.createElement('span');
-        name.className = 'session-name';
-        name.title = session.sessionUuid;
-        name.textContent = session.sessionName || 'Untitled';
+        // Tool name
+        var tdTool = document.createElement('td');
+        tdTool.className = 'pending-tool-name';
+        tdTool.textContent = session.toolName || '\u2014';
+        tr.appendChild(tdTool);
 
-        var tool = document.createElement('span');
-        tool.className = 'session-tool-name';
-        tool.textContent = session.toolName || '';
+        // Waiting since
+        var tdAge = document.createElement('td');
+        tdAge.className = 'text-muted small';
+        tdAge.textContent = formatAge(session.createdAt);
+        tr.appendChild(tdAge);
 
-        left.appendChild(badge);
-        left.appendChild(name);
-        left.appendChild(tool);
-        header.appendChild(left);
-        card.appendChild(header);
+        // Action
+        var tdAction = document.createElement('td');
+        tdAction.className = 'text-end';
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-primary';
+        btn.innerHTML = '<i class="fa-solid fa-keyboard me-1"></i>Provide Input';
+        btn.addEventListener('click', function () { openModal(session, tr); });
+        tdAction.appendChild(btn);
+        tr.appendChild(tdAction);
 
-        // ── Body ────────────────────────────────────────────────────────────────
-        var body = document.createElement('div');
-        body.className = 'session-card-body';
+        return tr;
+    }
+
+    // ── Modal ─────────────────────────────────────────────────────────────────
+
+    function openModal(session, tr) {
+        // Title
+        modalLabel.textContent = (session.sessionName || 'Session') +
+            (session.toolName ? ' \u2014 ' + session.toolName : '');
+
+        // Body
+        modalBody.innerHTML = '';
 
         if (session.reasoning && session.reasoning.trim()) {
-            var reasoning = document.createElement('div');
-            reasoning.className = 'reasoning-block';
-            reasoning.textContent = session.reasoning;
-            body.appendChild(reasoning);
+            var reasoningEl = document.createElement('div');
+            reasoningEl.className = 'modal-reasoning';
+            reasoningEl.textContent = session.reasoning;
+            modalBody.appendChild(reasoningEl);
         }
 
         var fields = session.formSchema && Array.isArray(session.formSchema.fields)
             ? session.formSchema.fields.filter(function (f) {
-                return f && f.name && f.type !== 'hidden' && f.type !== 'HIDDEN';
+                return f && f.name && (f.type || '').toLowerCase() !== 'hidden';
             })
             : [];
 
-        if (fields.length > 0) {
-            var fieldContainer = document.createElement('div');
-            fieldContainer.className = 'session-form-fields';
-            fields.forEach(function (f) {
-                fieldContainer.appendChild(buildField(f, session.sessionUuid));
-            });
-            body.appendChild(fieldContainer);
-        }
+        var fieldContainer = document.createElement('div');
+        fieldContainer.className = 'vstack gap-3';
+        fields.forEach(function (f) {
+            fieldContainer.appendChild(buildField(f, session.sessionUuid));
+        });
+        modalBody.appendChild(fieldContainer);
 
-        card.appendChild(body);
+        // Footer: error span + cancel + action buttons
+        modalFooter.innerHTML = '';
 
-        // ── Actions ─────────────────────────────────────────────────────────────
+        var errorSpan = document.createElement('span');
+        errorSpan.className = 'modal-error d-none';
+        modalFooter.appendChild(errorSpan);
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.setAttribute('data-bs-dismiss', 'modal');
+        cancelBtn.textContent = 'Cancel';
+        modalFooter.appendChild(cancelBtn);
+
         var actions = session.formSchema && Array.isArray(session.formSchema.actions)
             ? session.formSchema.actions
             : [{ name: 'ONCE', label: 'Approve', style: 'success' }];
-
-        var actionsRow = document.createElement('div');
-        actionsRow.className = 'session-card-actions';
 
         actions.forEach(function (action) {
             var btn = document.createElement('button');
             btn.type = 'button';
             var style = (action.style || '').toLowerCase();
-            btn.className = 'btn btn-sm btn-' + (style || 'primary');
+            btn.className = 'btn btn-' + (style || 'primary');
             btn.textContent = action.label || action.name;
             btn.addEventListener('click', function () {
-                submitSession(session, action.name, collectFields(session.sessionUuid, fields), card);
+                submitSession(session, action.name, collectFields(fields), tr, errorSpan);
             });
-            actionsRow.appendChild(btn);
+            modalFooter.appendChild(btn);
         });
 
-        card.appendChild(actionsRow);
-
-        // ── Result area ─────────────────────────────────────────────────────────
-        var result = document.createElement('div');
-        result.className = 'session-result';
-        result.id = 'result-' + session.sessionUuid;
-        card.appendChild(result);
-
-        return card;
+        bsModal.show();
     }
 
-    // ── Field builder ──────────────────────────────────────────────────────────
+    // ── Field builder ─────────────────────────────────────────────────────────
 
     function buildField(field, sessionUuid) {
         var wrapper = document.createElement('div');
-        var inputId = 'field-' + sessionUuid + '-' + field.name;
+        var inputId = 'modal-field-' + sessionUuid + '-' + field.name;
 
         var label = document.createElement('label');
         label.className = 'form-label mb-1';
@@ -149,6 +183,15 @@
                 sel.appendChild(option);
             });
             wrapper.appendChild(sel);
+        } else if (type === 'textarea') {
+            var ta = document.createElement('textarea');
+            ta.className = 'form-control form-control-sm';
+            ta.id = inputId;
+            ta.dataset.fieldName = field.name;
+            ta.rows = 4;
+            if (field.placeholder) ta.placeholder = field.placeholder;
+            if (field.required) ta.required = true;
+            wrapper.appendChild(ta);
         } else {
             var input = document.createElement('input');
             input.className = 'form-control form-control-sm';
@@ -164,26 +207,23 @@
         return wrapper;
     }
 
-    // ── Form collection ────────────────────────────────────────────────────────
+    // ── Field collection ──────────────────────────────────────────────────────
 
-    function collectFields(sessionUuid, fields) {
+    function collectFields(fields) {
         var values = {};
         fields.forEach(function (f) {
-            var el = document.querySelector('[data-field-name="' + f.name + '"]');
-            if (el) {
-                values[f.name] = el.value || '';
-            }
+            var el = modalBody.querySelector('[data-field-name="' + f.name + '"]');
+            if (el) values[f.name] = el.value || '';
         });
         return values;
     }
 
-    // ── Submission ─────────────────────────────────────────────────────────────
+    // ── Submission ────────────────────────────────────────────────────────────
 
-    function submitSession(session, action, fields, card) {
-        var buttons = card.querySelectorAll('.session-card-actions button');
-        buttons.forEach(function (b) { b.disabled = true; });
-
-        var resultEl = document.getElementById('result-' + session.sessionUuid);
+    function submitSession(session, action, fields, tr, errorSpan) {
+        errorSpan.classList.add('d-none');
+        var actionBtns = modalFooter.querySelectorAll('button:not([data-bs-dismiss])');
+        actionBtns.forEach(function (b) { b.disabled = true; });
 
         fetch('/api/chat/respond/' + session.sessionUuid, {
             method: 'POST',
@@ -197,43 +237,41 @@
         })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                resultEl.style.display = 'block';
-                if (data.status === 'BACKGROUND_RESUMED') {
-                    resultEl.className = 'session-result success';
-                    resultEl.innerHTML =
-                        '<i class="fa-solid fa-circle-check me-2"></i>Input received — background task is resuming.';
-                } else if (data.status === 'WEB_RESUMED') {
-                    resultEl.className = 'session-result success';
-                    resultEl.innerHTML =
-                        '<i class="fa-solid fa-circle-check me-2"></i>'
-                        + (action === 'DENIED' || action === 'DENY'
-                            ? 'Denied — the session will continue.'
-                            : 'Input submitted — the session is continuing.');
+                if (data.status === 'BACKGROUND_RESUMED' || data.status === 'WEB_RESUMED') {
+                    bsModal.hide();
+                    if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+                    if (tbody.querySelectorAll('tr').length === 0) {
+                        tableWrapper.classList.add('d-none');
+                        emptyEl.classList.remove('d-none');
+                    }
                 } else if (data.status === 'AWAITING_INPUT') {
-                    // Another prompt immediately required — reload the page so the new prompt appears
-                    resultEl.className = 'session-result success';
-                    resultEl.innerHTML =
-                        '<i class="fa-solid fa-circle-info me-2"></i>More input required — reloading…';
-                    setTimeout(function () { window.location.reload(); }, 1200);
+                    bsModal.hide();
+                    setTimeout(function () { window.location.reload(); }, 400);
                 } else {
-                    resultEl.className = 'session-result error';
-                    resultEl.innerHTML =
-                        '<i class="fa-solid fa-triangle-exclamation me-2"></i>'
-                        + escapeHtml(data.message || data.status || 'Unexpected response');
-                    buttons.forEach(function (b) { b.disabled = false; });
+                    errorSpan.textContent = data.message || data.status || 'Unexpected response';
+                    errorSpan.classList.remove('d-none');
+                    actionBtns.forEach(function (b) { b.disabled = false; });
                 }
             })
             .catch(function (err) {
-                resultEl.style.display = 'block';
-                resultEl.className = 'session-result error';
-                resultEl.innerHTML =
-                    '<i class="fa-solid fa-triangle-exclamation me-2"></i>'
-                    + 'Request failed: ' + escapeHtml(String(err));
-                buttons.forEach(function (b) { b.disabled = false; });
+                errorSpan.textContent = 'Request failed: ' + escapeHtml(String(err));
+                errorSpan.classList.remove('d-none');
+                actionBtns.forEach(function (b) { b.disabled = false; });
             });
     }
 
-    // ── Utilities ──────────────────────────────────────────────────────────────
+    // ── Utilities ─────────────────────────────────────────────────────────────
+
+    function formatAge(epochMs) {
+        if (!epochMs) return '';
+        var diff = Date.now() - epochMs;
+        var mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return mins + 'm ago';
+        var hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + 'h ago';
+        return Math.floor(hrs / 24) + 'd ago';
+    }
 
     function escapeHtml(str) {
         return String(str)
@@ -243,7 +281,7 @@
             .replace(/"/g, '&quot;');
     }
 
-    // ── Entry point ────────────────────────────────────────────────────────────
+    // ── Entry point ───────────────────────────────────────────────────────────
 
     load();
 

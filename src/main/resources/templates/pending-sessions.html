@@ -45,9 +45,38 @@
         </a>
     </div>
 
-    <!-- Session cards rendered by JS -->
-    <div id="sessions-container"></div>
+    <!-- Sessions table -->
+    <div id="sessions-table-wrapper" class="d-none">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 pending-table">
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Origin</th>
+                        <th>Tool</th>
+                        <th>Waiting since</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="sessions-tbody"></tbody>
+            </table>
+        </div>
+    </div>
 
+</div>
+
+<!-- Input modal -->
+<div class="modal fade" id="input-modal" tabindex="-1" aria-labelledby="input-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="input-modal-label">Provide Input</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="input-modal-body"></div>
+            <div class="modal-footer" id="input-modal-footer"></div>
+        </div>
+    </div>
 </div>
 
 <script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>

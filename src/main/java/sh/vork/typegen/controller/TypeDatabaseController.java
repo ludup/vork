@@ -213,6 +213,12 @@ public class TypeDatabaseController {
             fd.put("fields", buildInspectorSchema(type).get("fields"));
             fd.put("tableColumn", ann != null ? ann.tableColumn() : false);
             fd.put("inputType", "auto");
+        } else if (type.isEnum()) {
+            fd.put("type", "enum");
+            boolean defaultColumn = !typeHasAnnotations;
+            fd.put("tableColumn", ann != null ? ann.tableColumn() : defaultColumn);
+            fd.put("inputType", "select");
+            fd.put("options", buildEnumOptions(type));
         } else {
             fd.put("type", simpleTypeName(type));
             // tableColumn: if the type has @DisplayField annotations use the annotation;
@@ -229,6 +235,32 @@ public class TypeDatabaseController {
         if (ann != null && ann.required())               fd.put("required", true);
 
         return fd;
+    }
+
+    /** Builds a list of {value, label} option maps for an enum type.
+     *  Probes for {@code getDisplayName()}, {@code getLabel()}, or {@code getDescription()}
+     *  to obtain a human-readable label; falls back to {@link Enum#name()}.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static List<Map<String, String>> buildEnumOptions(Class<?> enumType) {
+        java.lang.reflect.Method displayMethod = null;
+        for (String methodName : new String[]{"getDisplayName", "getLabel", "getDescription"}) {
+            try { displayMethod = enumType.getMethod(methodName); break; }
+            catch (NoSuchMethodException ignored) {}
+        }
+        final java.lang.reflect.Method dm = displayMethod;
+        List<Map<String, String>> options = new ArrayList<>();
+        for (Object c : enumType.getEnumConstants()) {
+            Map<String, String> opt = new LinkedHashMap<>();
+            opt.put("value", ((Enum) c).name());
+            String lbl = ((Enum) c).name();
+            if (dm != null) {
+                try { lbl = String.valueOf(dm.invoke(c)); } catch (Exception ignored) {}
+            }
+            opt.put("label", lbl);
+            options.add(opt);
+        }
+        return options;
     }
 
     /** Resolves the element type of a {@code List<T>} generic type. */

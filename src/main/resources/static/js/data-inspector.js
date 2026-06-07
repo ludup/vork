@@ -40,7 +40,7 @@
             types.forEach(function (t) {
                 var opt = document.createElement('option');
                 opt.value = t.fqn;
-                opt.textContent = t.simpleName + ' (' + t.fqn + ')';
+                opt.textContent = t.simpleName;
                 typeSelect.appendChild(opt);
             });
             // Auto-select from URL hash e.g. #sh.vork.generated.Customer
@@ -143,8 +143,16 @@
             var tr = document.createElement('tr');
             columns.forEach(function (col) {
                 var td = document.createElement('td');
-                td.title = displayValue(item[col.name]);
-                td.textContent = displayValue(item[col.name]);
+                var raw = item[col.name];
+                var display;
+                if (col.type === 'enum' && Array.isArray(col.options)) {
+                    var match = col.options.find(function (o) { return o.value === raw; });
+                    display = match ? match.label : displayValue(raw);
+                } else {
+                    display = displayValue(raw);
+                }
+                td.title = display;
+                td.textContent = display;
                 tr.appendChild(td);
             });
 
@@ -162,7 +170,7 @@
 
     function tableColumns(schema) {
         if (!schema || !Array.isArray(schema.fields)) return [];
-        return schema.fields.filter(function (f) { return f.tableColumn; });
+        return schema.fields.filter(function (f) { return f.tableColumn && f.name !== 'uuid'; });
     }
 
     function displayValue(val) {
@@ -419,6 +427,23 @@
             if (field.required) ta.required = true;
             if (value !== null && value !== undefined) ta.value = String(value);
             wrapper.appendChild(ta);
+        } else if (inputType === 'select' && Array.isArray(field.options)) {
+            var sel = document.createElement('select');
+            sel.className = 'form-select form-select-sm';
+            sel.name = inputName;
+            if (field.required) sel.required = true;
+            var emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = '\u2014 select \u2014';
+            sel.appendChild(emptyOpt);
+            field.options.forEach(function (opt) {
+                var option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (value === opt.value) option.selected = true;
+                sel.appendChild(option);
+            });
+            wrapper.appendChild(sel);
         } else {
             var input = document.createElement('input');
             input.type = inputType;
@@ -465,7 +490,7 @@
 
         var label = document.createElement('label');
         label.className = 'form-label mb-1';
-        label.textContent = (field.label || field.name) + ' (list)';
+        label.textContent = field.label || field.name;
         wrapper.appendChild(label);
 
         var container = document.createElement('div');
