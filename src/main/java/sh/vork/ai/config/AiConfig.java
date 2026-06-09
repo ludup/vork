@@ -63,6 +63,8 @@ import sh.vork.ai.function.DownloadFileRequest;
 import sh.vork.ai.function.ListSshConnectionsRequest;
 import sh.vork.ai.function.SetSshAliasRequest;
 import sh.vork.ai.function.SshConnectRequest;
+import sh.vork.ai.function.SshCreateConnectionRequest;
+import sh.vork.ai.tool.SshCreateConnectionTool;
 import sh.vork.ai.function.UploadFileRequest;
 import sh.vork.ai.agent.AgentTemplate;
 import sh.vork.ai.registry.ToolRegistry;
@@ -428,6 +430,21 @@ public class AiConfig {
     @Bean
     @Restricted
     @ToolCategory("SSH & File Transfer")
+    public ToolCallback createSshConnection(SshCreateConnectionTool sshCreateConnectionTool) {
+        ToolCallback delegate = FunctionToolCallback
+                .builder("createSshConnection", sshCreateConnectionTool::execute)
+                .description("""
+                    Save a new SSH connection by collecting hostname, port, username and credentials \
+                    through a secure form — credentials never appear in the conversation history. \
+                    REASONING_HINT: Use this tool when the user wants to add, register, or set up a new SSH server \
+                    rather than connect to one immediately. \
+                    After saving, the connection can be opened with the connectSsh tool. \
+                    An optional alias can be provided to give the connection a friendly name."""
+                        .stripIndent())
+                .inputType(SshCreateConnectionRequest.class)
+                .build();
+        return new VisualizableToolCallback(delegate, sshCreateConnectionTool::formatAuthorizationDetails);
+    }
     public ToolCallback sshDownloadFile(DownloadFileTool downloadFileTool) {
         return FunctionToolCallback
                 .builder("sshDownloadFile", downloadFileTool::execute)

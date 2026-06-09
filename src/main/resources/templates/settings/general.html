@@ -26,10 +26,13 @@
         <div class="card-body">
             <p class="text-muted small mb-3">
                 The public-facing base URL of this Vork instance (e.g. <code>https://my.vork.app</code>).
-                Used to generate authorization form links for out-of-band input.
-                Leave blank to use the secure Vork Relay <code>relay.vork.sh</code>
-                (see <a href="https://github.com/ludup/vork-relay" target="_blank">Vork Relay</a>
-                for full specification and code).
+                Used to generate authorization form links for out-of-band approvals.<br>
+                <strong>Leave blank</strong> to route through the public zero-knowledge relay at
+                <code>relay.vork.sh</code> — no firewall changes required.<br>
+                <strong>Set to your appliance URL</strong> to use the relay built directly into Vork.
+                The appliance hosts the same encrypted relay protocol; you must open HTTPS to it from the internet.
+                See <a href="https://github.com/ludup/vork-relay" target="_blank">vork-relay</a> for the
+                full zero-knowledge specification.
             </p>
             <label class="form-label" for="app-base-url">Base URL</label>
             <input type="url" id="app-base-url" class="form-control mb-3"

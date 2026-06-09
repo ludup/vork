@@ -69,11 +69,21 @@ Moving sensitive data through a public relay creates an obvious problem: the rel
 
 Even if an attacker gains full control of the relay server, its database, and its memory, they have only useless ciphertext. The key was never there.
 
-### The public relay
+### Relay options
 
-A hosted relay instance runs at `relay.vork.sh` and is the default out of the box. No registration, no configuration. It's designed to Just Vork&trade;. You can self-host the relay if you prefer; the source is at [github.com/ludup/vork-relay](https://github.com/ludup/vork-relay) and it's a single Spring Boot jar.
+There are three ways to use the relay, in order of least to most infrastructure:
 
-My company **[Jadpative](https://jadaptive.com)** hosts and pays for the relay service. 
+| Option | How | Inbound port needed? |
+|---|---|---|
+| **Public relay** (default) | Leave `Base URL` blank in Settings → General. Uses `relay.vork.sh`. | No |
+| **Built-in relay** | Set `Base URL` to your appliance's own public URL (e.g. `https://my.vork.app`). Vork serves the relay API itself. | Yes — HTTPS on your appliance |
+| **Self-hosted relay** | Run your own instance of [vork-relay-server](https://github.com/ludup/vork-relay). | Yes — on the relay server |
+
+The **built-in relay** is made possible because `vork-relay-lib` — the relay store, API, and auth form — is embedded directly in the appliance. The protocol is identical whether you use the public relay, the built-in relay, or a self-hosted relay. All three options provide the same AES-256-GCM zero-knowledge guarantees.
+
+A hosted relay instance runs at `relay.vork.sh` and is the default — no registration, no configuration, no firewall changes. It Just Vork&trade;. The source for the standalone relay server is at [github.com/ludup/vork-relay](https://github.com/ludup/vork-relay).
+
+My company **[Jadaptive](https://jadaptive.com)** hosts and pays for the relay service.
 
 ---
 

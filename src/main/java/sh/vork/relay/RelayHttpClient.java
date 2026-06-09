@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import sh.vork.relay.lib.model.RelaySubmission;
 
 /**
  * Thin HTTP client for the vork-relay zero-knowledge relay protocol.

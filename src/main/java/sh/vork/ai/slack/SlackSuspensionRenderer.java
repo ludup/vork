@@ -25,7 +25,7 @@ import sh.vork.ai.telegram.TelegramChatResumptionService;
 import sh.vork.notification.slack.SlackApiClient;
 import sh.vork.relay.RelayEncryptionService;
 import sh.vork.relay.RelayHttpClient;
-import sh.vork.relay.RelaySubmission;
+import sh.vork.relay.lib.model.RelaySubmission;
 import sh.vork.setup.SystemSettingsService;
 
 /**

@@ -27,7 +27,7 @@ import sh.vork.notification.NotificationProviderConfig;
 import sh.vork.notification.user.UserNotificationMedia;
 import sh.vork.relay.RelayEncryptionService;
 import sh.vork.relay.RelayHttpClient;
-import sh.vork.relay.RelaySubmission;
+import sh.vork.relay.lib.model.RelaySubmission;
 import sh.vork.setup.SystemSettings;
 import sh.vork.setup.SystemSettingsService;
 import com.jadaptive.orm.DatabaseRepository;

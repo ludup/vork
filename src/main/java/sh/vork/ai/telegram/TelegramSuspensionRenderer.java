@@ -24,7 +24,7 @@ import sh.vork.notification.telegram.TelegramApiClient;
 import sh.vork.notification.telegram.TelegramApiClient.InlineButton;
 import sh.vork.relay.RelayEncryptionService;
 import sh.vork.relay.RelayHttpClient;
-import sh.vork.relay.RelaySubmission;
+import sh.vork.relay.lib.model.RelaySubmission;
 import sh.vork.setup.SystemSettingsService;
 
 /**

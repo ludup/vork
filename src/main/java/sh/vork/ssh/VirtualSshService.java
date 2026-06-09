@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -578,7 +579,7 @@ public class VirtualSshService extends AbstractSshServer {
 				return created;
 		}
 
-		throw hostKeyPrompt(host, currentHostKey, null);	
+		throw hostKeyPrompt("connectSsh", host, currentHostKey, null);	
 	}
 
 	private VorkNode verifyHostKey(VorkNode node, SshPublicKey currentHostKey) throws IOException, SshException {
@@ -587,7 +588,7 @@ public class VirtualSshService extends AbstractSshServer {
 			&&  SshKeyUtils.getPublicKey(node.verifiedHostKey()).equals(currentHostKey))	{
 			return node;
 		} else {
-			throw hostKeyPrompt(node.host(), currentHostKey, node.verifiedHostKey());
+			throw hostKeyPrompt("connectSsh", node.host(), currentHostKey, node.verifiedHostKey());
 		}
 	}
 
@@ -657,7 +658,7 @@ public class VirtualSshService extends AbstractSshServer {
 				formSchema);
 	}
 
-	private static ToolSuspensionException hostKeyPrompt(String host, SshPublicKey currentHostKey, String verifiedHostKey) throws IOException, SshException {
+	private static ToolSuspensionException hostKeyPrompt(String toolName, String host, SshPublicKey currentHostKey, String verifiedHostKey) throws IOException, SshException {
 
 		String description;
 		String placeholder;
@@ -693,9 +694,205 @@ public class VirtualSshService extends AbstractSshServer {
 		);
 
 		return new ToolSuspensionException(
-				"connectSsh",
+				toolName,
 				"",
 				placeholder,
+				schema);
+	}
+
+	/**
+	 * Creates a new SSH node by collecting connection details and credentials via
+	 * an interactive form, verifying the host key, testing authentication, and
+	 * persisting the node.  No connection is left open after this call.
+	 *
+	 * @param alias optional friendly label for the saved connection
+	 * @return human-readable result message
+	 */
+	public String createAndSaveConnection(String alias) {
+		log.debug("ENTER createAndSaveConnection: alias={}", alias);
+
+		// ── Step 1: Collect connection details ──────────────────────────────
+		Object hostnameCtx = ToolExecutionContext.get("create-ssh-hostname");
+		if (hostnameCtx == null || hostnameCtx.toString().isBlank()) {
+			log.debug("Step 1: presenting connection-details form");
+			String pendingNodeUuid = UUID.randomUUID().toString();
+			throw createConnectionForm(pendingNodeUuid);
+		}
+
+		String hostname        = hostnameCtx.toString().trim();
+		String portStr         = Objects.toString(ToolExecutionContext.get("create-ssh-port"), "22");
+		String username        = Objects.toString(ToolExecutionContext.get("create-ssh-username"), "").trim();
+		String pendingNodeUuid = Objects.toString(ToolExecutionContext.get("create-ssh-pending-uuid"), "").trim();
+
+		if (username.isBlank()) {
+			return "SSH username is required.";
+		}
+		if (pendingNodeUuid.isBlank()) {
+			pendingNodeUuid = UUID.randomUUID().toString();
+		}
+
+		int port;
+		try {
+			port = Integer.parseInt(portStr.trim());
+			if (port < 1 || port > 65535) port = 22;
+		} catch (NumberFormatException e) {
+			port = 22;
+		}
+
+		String normalizedHostname = normalizeHost(hostname);
+		String canonicalHost = (port == 22) ? normalizedHostname : normalizedHostname + ":" + port;
+
+		// ── Step 2: Host key verification ────────────────────────────────────
+		Object hostKeyApproval = ToolExecutionContext.get("HOST_KEY_VERIFICATION");
+		if (!"true".equals(hostKeyApproval)) {
+			log.debug("Step 2: fetching host key for {}:{}", normalizedHostname, port);
+			SshPublicKey currentKey;
+			try {
+				currentKey = getHostKey(normalizedHostname, port, 30);
+			} catch (Exception e) {
+				log.warn("Failed to fetch host key for {}:{}: {}", normalizedHostname, port, e.getMessage());
+				return "Failed to connect to " + normalizedHostname + ":" + port + " — " + e.getMessage();
+			}
+			try {
+				throw hostKeyPrompt("createSshConnection", canonicalHost, currentKey, null);
+			} catch (IOException | SshException e) {
+				return "Failed to prepare host key prompt: " + e.getMessage();
+			}
+		}
+
+		// ── Step 3: Save node and test connection ────────────────────────────
+		log.debug("Step 3: host key approved — saving node and testing connection");
+		VorkUser principal = currentPrincipalUser();
+
+		SshPublicKey currentKey;
+		try {
+			currentKey = getHostKey(normalizedHostname, port, 30);
+		} catch (Exception e) {
+			log.warn("Failed to re-verify host key for {}:{}: {}", normalizedHostname, port, e.getMessage());
+			return "Failed to re-verify host " + normalizedHostname + ":" + port + " — " + e.getMessage();
+		}
+
+		String formattedHostKey;
+		try {
+			formattedHostKey = SshKeyUtils.getFormattedKey(currentKey, "Vork SSH Host Key");
+		} catch (SshException e) {
+			return "Failed to format host key: " + e.getMessage();
+		}
+
+		long now = System.currentTimeMillis();
+		VorkNode node = new VorkNode(pendingNodeUuid, principal.uuid(), canonicalHost, username, now, now, formattedHostKey);
+
+		// Load credentials submitted via the form
+		String password   = credentialStore.getSecret(principal, secretKeyForPassword(pendingNodeUuid));
+		String privateKey = credentialStore.getSecret(principal, secretKeyForPrivateKey(pendingNodeUuid));
+		String passphrase = credentialStore.getSecret(principal, secretKeyForPassphrase(pendingNodeUuid));
+
+		// Build authenticator list
+		List<ClientAuthenticator> authenticators = new ArrayList<>();
+		if (password != null && !password.isBlank()) {
+			authenticators.add(PasswordAuthenticator.forPassword(password));
+		}
+		if (privateKey != null && !privateKey.isBlank()) {
+			try {
+				SshKeyPair keyPair = SshKeyUtils.getPrivateKey(privateKey, passphrase);
+				authenticators.add(new KeyPairAuthenticator(keyPair));
+			} catch (IOException | InvalidPassphraseException e) {
+				log.warn("Failed to load private key for create-connection test [node={}]: {}", pendingNodeUuid, e.getMessage());
+			}
+		}
+		if (authenticators.isEmpty()) {
+			return "No SSH credentials provided. Please supply a password or private key.";
+		}
+
+		// Test the connection — connect, authenticate, then immediately close
+		SshClientContext context = new SshClientContext();
+		context.setUsername(username);
+		final String capturedHostKey = formattedHostKey;
+		context.setHostKeyVerification((h, pk) -> {
+			try {
+				return SshKeyUtils.getPublicKey(capturedHostKey).equals(pk);
+			} catch (IOException e) {
+				log.error("Host key mismatch during create-connection test [node={}]: {}", node.uuid(), e.getMessage());
+				return false;
+			}
+		});
+
+		try {
+			SshClient client = SshClientBuilder.create()
+					.withTarget(normalizedHostname, port)
+					.withUsername(username)
+					.withSshContext(context)
+					.withConnectTimeout(Duration.ofSeconds(30))
+					.build();
+			try {
+				client.getConnection().getConnectFuture().waitFor(Duration.ofSeconds(30));
+				if (!client.getConnection().getConnectFuture().isDoneAndSuccess()) {
+					return "Failed to connect to " + normalizedHostname + ":" + port + " within timeout.";
+				}
+				boolean authenticated = false;
+				for (ClientAuthenticator a : authenticators) {
+					try {
+						if (client.authenticate(a, Duration.ofSeconds(30).toMillis()) && client.isAuthenticated()) {
+							authenticated = true;
+							break;
+						}
+					} catch (Exception authEx) {
+						log.debug("Authenticator {} failed: {}", a.getClass().getSimpleName(), authEx.getMessage());
+					}
+				}
+				if (!authenticated) {
+					return "Authentication failed for " + username + "@" + normalizedHostname + ":" + port + ". Please check your credentials.";
+				}
+			} finally {
+				try { client.close(); } catch (IOException ignored) {}
+			}
+		} catch (IOException | SshException e) {
+			log.warn("SSH connection test failed [node={}]: {}", pendingNodeUuid, e.getMessage());
+			return "Connection test failed — " + e.getMessage();
+		}
+
+		// Persist node only after successful authentication test
+		nodeRepository.save(node);
+		log.info("SSH node created: {}@{}:{} [uuid={}]", username, normalizedHostname, port, pendingNodeUuid);
+
+		String effectiveAlias = (alias != null && !alias.isBlank()) ? alias : username + "@" + canonicalHost;
+		log.debug("EXIT createAndSaveConnection: node saved [alias={}]", effectiveAlias);
+		return "SSH connection saved: " + username + "@" + canonicalHost
+				+ ". Use \"connect to " + effectiveAlias + "\" to open a session.";
+	}
+
+	private static ToolSuspensionException createConnectionForm(String pendingNodeUuid) {
+		List<FormField> fields = List.of(
+				new FormField("create-ssh-hostname", "text", "Hostname / IP",
+						"e.g. 192.168.1.1 or myserver.example.com", true, FieldSource.CONTEXT, List.of()),
+				new FormField("create-ssh-port", "text", "Port",
+						"22", false, FieldSource.CONTEXT, List.of()),
+				new FormField("create-ssh-username", "text", "SSH Username",
+						"e.g. root, ubuntu, ec2-user", true, FieldSource.CONTEXT, List.of()),
+				new FormField(secretKeyForPassword(pendingNodeUuid), "password", "Password",
+						"Leave blank if using key-based auth", false, FieldSource.SECRET, List.of()),
+				new FormField(secretKeyForPrivateKey(pendingNodeUuid), "textarea", "Private Key",
+						"Paste PEM/OpenSSH key contents (leave blank if using password)", false, FieldSource.SECRET, List.of()),
+				new FormField(secretKeyForPassphrase(pendingNodeUuid), "password", "Key Passphrase",
+						"Leave blank if key is not passphrase-protected", false, FieldSource.SECRET, List.of()),
+				new FormField("create-ssh-pending-uuid", "HIDDEN", "",
+						pendingNodeUuid, false, FieldSource.CONTEXT, List.of())
+		);
+
+		InteractionFormSchema schema = new InteractionFormSchema(
+				"AUTHORIZE_TOOL",
+				"New SSH Connection",
+				"Provide the connection details and credentials. The host key will be verified separately before saving.",
+				fields,
+				List.of(
+						new FormAction("ONCE", "Continue", "primary"),
+						new FormAction("DENIED", "Cancel", "danger")
+				)
+		);
+
+		return new ToolSuspensionException(
+				"createSshConnection", "",
+				"SSH connection details are required to create a new connection.",
 				schema);
 	}
 
