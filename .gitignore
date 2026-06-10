@@ -22,3 +22,5 @@
 /JOURNAL.md
 /PROGRESS.md
 /.github/
+/.vscode/
+/package-lock.json
