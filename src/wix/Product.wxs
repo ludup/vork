@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Vork — Windows MSI Package
+  Built with WiX Toolset v7  (https://wixtoolset.org)
+
+  Preprocessor variables (passed via -d on the wix command line):
+    Version         Windows 4-part version, e.g. 1.0.0.0
+    ArtifactDir     Path to Maven target\ directory
+    WinSWDir        Path to directory containing WinSW-x64.exe
+    SrcDir          Path to this src\wix\ directory
+
+  Build (see build.bat):
+    wix build Product.wxs                  ^
+        -d Version=1.0.0.0                 ^
+        -d ArtifactDir=..\..\target        ^
+        -d WinSWDir=.downloads             ^
+        -d SrcDir=.                        ^
+        -ext WixToolset.Util.wixext@7.0.0  ^
+        -o out\vork-1.0.0.msi
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Vork AI Server"
+           Manufacturer="Vork"
+           Version="$(var.Version)"
+           UpgradeCode="A7C2E4F1-3B8D-4A92-9F5E-1D6C2A7B3E8F"
+           Language="1033"
+           InstallerVersion="500">
+
+    <SummaryInformation Description="Vork AI Server — multi-provider AI chat with agent automation." />
+
+    <!-- Prevent downgrades; remove the old version silently on upgrade -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+                  Schedule="afterInstallInitialize" />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- ── Registry properties: detect an existing JDK installation ─────────── -->
+    <!--
+      The VorkService.xml WinSW config uses %JAVA_HOME%\bin\java.exe.
+      Any of the registry keys below being present means a compatible JDK is
+      already on this machine.  The Bundle handles actual JDK installation;
+      these searches are informational / used by the upgrade condition.
+    -->
+    <Property Id="JDKHOMEDIR">
+      <RegistrySearch Id="TemurinJdkPath"
+                      Root="HKLM"
+                      Key="SOFTWARE\Eclipse Adoptium\JDK\25\hotspot\MSI"
+                      Name="Path"
+                      Type="raw"
+                      Win64="yes" />
+    </Property>
+
+    <!-- ── Directory layout ────────────────────────────────────────────────── -->
+    <!--
+      Default install root:  C:\Program Files\Vork\
+        conf.d\              — default database.properties (never overwritten on upgrade)
+        conf.d\files\        — user-uploaded files (created empty on install)
+        conf.d\private\      — private key material (created empty on install)
+        logs\                — WinSW wrapper log (Spring Boot logs internally)
+    -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="Vork">
+        <Directory Id="ConfDDir"   Name="conf.d">
+          <Directory Id="FilesDir"   Name="files" />
+          <Directory Id="PrivateDir" Name="private" />
+        </Directory>
+        <Directory Id="LogsDir" Name="logs" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- ── Component: VORK_HOME system environment variable ─────────────────── -->
+    <ComponentGroup Id="EnvComponents" Directory="INSTALLDIR">
+      <Component Id="VorkEnvComp" Guid="*">
+        <CreateFolder />
+        <util:Environment Id="VorkHomeVar"
+                          Name="VORK_HOME"
+                          Value="[INSTALLDIR]"
+                          System="yes"
+                          Action="set"
+                          Permanent="no" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Component: application JAR ──────────────────────────────────────── -->
+    <ComponentGroup Id="AppComponents" Directory="INSTALLDIR">
+      <Component Id="VorkJarComp" Guid="*">
+        <!-- build.bat copies target\vork-*.jar → target\vork.jar for a stable name -->
+        <File Id="VorkJar"
+              Source="$(var.ArtifactDir)\vork.jar"
+              Name="vork.jar"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Component: Windows service (WinSW host + XML config) ─────────────── -->
+    <!--
+      WinSW (https://github.com/winsw/winsw) acts as the service host executable.
+      Renamed to VorkService.exe so the SCM ImagePath and the XML config name match.
+      On service start, WinSW reads VorkService.xml in the same directory and
+      launches:  %JAVA_HOME%\bin\java.exe -jar "%VORK_HOME%\vork.jar"
+
+      Vork requires a full JDK — not a bare JRE — because it compiles Java records
+      at runtime via javax.tools.JavaCompiler.
+    -->
+    <ComponentGroup Id="ServiceComponents" Directory="INSTALLDIR">
+
+      <Component Id="VorkServiceComp" Guid="*">
+        <!-- WinSW renamed to the service executable name -->
+        <File Id="WinSWExe"
+              Source="$(var.WinSWDir)\WinSW-x64.exe"
+              Name="VorkService.exe"
+              KeyPath="yes" />
+
+        <!-- Register as a Windows auto-start service -->
+        <ServiceInstall Id="VorkSvcInstall"
+                        Name="VorkService"
+                        DisplayName="Vork AI Server"
+                        Description="Vork — Multi-provider AI chat with agent automation and session management."
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="LocalSystem" />
+
+        <!-- Start after install; stop + remove on uninstall -->
+        <ServiceControl Id="VorkSvcStart"
+                        Name="VorkService"
+                        Start="install"
+                        Wait="no" />
+        <ServiceControl Id="VorkSvcStop"
+                        Name="VorkService"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+      </Component>
+
+      <Component Id="WinSWConfigComp" Guid="*">
+        <!-- WinSW reads this XML to know what process to launch -->
+        <File Id="WinSWXml"
+              Source="$(var.SrcDir)\VorkService.xml"
+              Name="VorkService.xml"
+              KeyPath="yes" />
+      </Component>
+
+    </ComponentGroup>
+
+    <!-- ── Component: default configuration ─────────────────────────────────── -->
+    <!--
+      NeverOverwrite="yes" ensures database.properties is not clobbered on upgrade,
+      so any credentials / custom settings the admin added are preserved.
+    -->
+    <ComponentGroup Id="ConfComponents" Directory="ConfDDir">
+      <Component Id="DatabasePropsComp" Guid="*">
+        <File Id="DatabaseProps"
+              Source="$(var.SrcDir)\defaults\database.properties"
+              Name="database.properties"
+              KeyPath="yes"
+              NeverOverwrite="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Component: empty runtime directories ─────────────────────────────── -->
+    <ComponentGroup Id="RuntimeDirComponents">
+      <Component Id="FilesDirComp" Guid="*" Directory="FilesDir">
+        <CreateFolder />
+      </Component>
+      <Component Id="PrivateDirComp" Guid="*" Directory="PrivateDir">
+        <CreateFolder />
+      </Component>
+      <Component Id="LogsDirComp" Guid="*" Directory="LogsDir">
+        <CreateFolder />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Single feature: complete install ─────────────────────────────────── -->
+    <Feature Id="Complete" Title="Vork AI Server" Level="1">
+      <ComponentGroupRef Id="EnvComponents" />
+      <ComponentGroupRef Id="AppComponents" />
+      <ComponentGroupRef Id="ServiceComponents" />
+      <ComponentGroupRef Id="ConfComponents" />
+      <ComponentGroupRef Id="RuntimeDirComponents" />
+    </Feature>
+
+  </Package>
+</Wix>

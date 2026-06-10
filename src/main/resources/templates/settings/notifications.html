@@ -80,7 +80,7 @@
     </div>
 </div>
 
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/vork-modal.js"></script>
 <script>
     let providerModal;
     let allProviders = [];   // [{providerKey, displayName, settingDefinitions}]
@@ -89,7 +89,7 @@
 
     // ── Init ──────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
-        providerModal = new bootstrap.Modal(document.getElementById('providerModal'));
+        providerModal = new VorkModal(document.getElementById('providerModal'));
         document.getElementById('providerModal').addEventListener('hidden.bs.modal', resetModal);
         loadAll();
     });

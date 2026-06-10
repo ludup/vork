@@ -169,7 +169,7 @@
     </div>
 </div>
 
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/vork-modal.js"></script>
 <script src="/packages/npm/qrious/current/dist/qrious.min.js"></script>
 <script>
     let addModal;
@@ -181,7 +181,7 @@
     let slackPollTimer           = null;
 
     document.addEventListener('DOMContentLoaded', function () {
-        addModal = new bootstrap.Modal(document.getElementById('addModal'));
+        addModal = new VorkModal(document.getElementById('addModal'));
         document.getElementById('addModal').addEventListener('hidden.bs.modal', onModalHidden);
         loadAll();
     });

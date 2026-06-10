@@ -206,6 +206,12 @@
                                     Set as global default provider &amp; model
                                 </label>
                             </div>
+                            <div id="transcription-toggle-wrap" class="mb-3 d-none">
+                                <div class="form-switch">
+                                    <input type="checkbox" class="form-check-input" id="enable-transcription" checked>
+                                    <label class="form-check-label small" for="enable-transcription" id="transcription-toggle-label">Enable voice transcription</label>
+                                </div>
+                            </div>
                             <button id="btn-save-provider" class="btn btn-primary w-100"
                                     onclick="saveProvider()">
                                 <i class="fa-solid fa-arrow-right me-2"></i>Save &amp; Continue
@@ -378,6 +384,16 @@
 
 <script>
     let selectedProvider = null;
+    let transcriptionProviders = [];
+
+    async function loadTranscriptionProviders() {
+        try {
+            const res = await fetch('/api/transcription/providers');
+            transcriptionProviders = res.ok ? await res.json() : [];
+        } catch (e) {
+            transcriptionProviders = [];
+        }
+    }
 
     function showAlert(msg, type) {
         document.getElementById('alert-area').innerHTML =
@@ -414,6 +430,7 @@
         document.getElementById('config-' + provider).classList.remove('d-none');
         document.getElementById('provider-actions').classList.remove('d-none');
         document.getElementById('model-select-area').classList.add('d-none');
+        document.getElementById('transcription-toggle-wrap').classList.add('d-none');
         clearAlert();
     }
 
@@ -800,6 +817,17 @@
 
             document.getElementById('model-select-area').classList.remove('d-none');
             showAlert((data.models?.length || 0) + ' model(s) discovered. Select your default below.', 'success');
+
+            const tp = transcriptionProviders.find(function(p) { return p.backedByAiProvider === selectedProvider; });
+            const tWrap = document.getElementById('transcription-toggle-wrap');
+            if (tp) {
+                document.getElementById('transcription-toggle-label').textContent =
+                    'Use ' + tp.displayName + ' to transcribe audio messages';
+                document.getElementById('enable-transcription').dataset.providerKey = tp.providerKey;
+                tWrap.classList.remove('d-none');
+            } else {
+                tWrap.classList.add('d-none');
+            }
         } catch (e) {
             showAlert('Connection test failed — please check your credentials.', 'danger');
         } finally {
@@ -834,6 +862,18 @@
             });
             const data = await res.json();
             if (data.error) { showAlert(data.error, 'danger'); return; }
+
+            // Save transcription config if the toggle is visible and checked
+            const transcribeEl = document.getElementById('enable-transcription');
+            const tWrap = document.getElementById('transcription-toggle-wrap');
+            if (!tWrap.classList.contains('d-none') && transcribeEl.checked && transcribeEl.dataset.providerKey) {
+                await fetch('/api/transcription/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ providerKey: transcribeEl.dataset.providerKey, settings: {} })
+                }).catch(function() {});
+            }
+
             setStep(3);
         } catch (e) {
             showAlert('Save failed — please try again.', 'danger');
@@ -843,9 +883,10 @@
         }
     }
 
-    // On load: no auto-selection — user must choose a provider
+    // On load: fetch transcription providers so the toggle is ready when models are discovered
+    loadTranscriptionProviders();
     fetch('/api/setup/status').catch(function() {});
 </script>
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/vork-modal.js"></script>
 </body>
 </html>

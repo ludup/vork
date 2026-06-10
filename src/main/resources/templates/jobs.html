@@ -272,7 +272,7 @@
 
     // ── Initialise ────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
-        jobModal = new bootstrap.Modal(document.getElementById('jobModal'));
+        jobModal = new VorkModal(document.getElementById('jobModal'));
         loadAgents();
         loadModels();
         // Hydrate allJobs from server-rendered data for the edit flow
@@ -488,6 +488,6 @@
                'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
 </script>
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/vork-modal.js"></script>
 </body>
 </html>

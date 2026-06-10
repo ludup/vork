@@ -153,7 +153,7 @@
     </div>
 </div>
 
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/vork-modal.js"></script>
 <script>
     let agentModal;
     let allAgents  = [];
@@ -162,7 +162,7 @@
 
     // ── Init ──────────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
-        agentModal = new bootstrap.Modal(document.getElementById('agentModal'));
+        agentModal = new VorkModal(document.getElementById('agentModal'));
         loadData();
 
         document.getElementById('agentModal').addEventListener('hidden.bs.modal', function () {

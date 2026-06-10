@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Vork — Windows Bootstrapper Bundle
+  Built with WiX Toolset v7  (https://wixtoolset.org)
+
+  The bundle chains:
+    1. Eclipse Temurin JDK 25 (x64 MSI) — skipped when any JDK 25 is detected
+    2. Vork MSI                              — always installed / upgraded
+
+  Vork requires a full JDK (not just a JRE) because it compiles Java records
+  at runtime using javax.tools.JavaCompiler.
+
+  Preprocessor variables (passed via -d on the wix command line):
+    Version         Windows 4-part version, e.g. 1.0.0.0
+    MsiPath         Path to the built Vork MSI
+    JdkMsiPath      Path to the Eclipse Temurin JDK 25 MSI
+                    (downloaded by build.bat if absent)
+
+  Build (see build.bat):
+    wix build Bundle.wxs                    ^
+        -d Version=1.0.0.0                  ^
+        -d MsiPath=out\vork-1.0.0.msi       ^
+        -d JdkMsiPath=.downloads\temurin-25-jdk-x64.msi  ^
+        -ext WixToolset.Bal.wixext@7.0.0    ^
+        -ext WixToolset.Util.wixext@7.0.0   ^
+        -o out\vork-1.0.0-setup.exe
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Bundle Name="Vork AI Server"
+          Version="$(var.Version)"
+          Manufacturer="Vork"
+          UpgradeCode="B9D3F6A2-7C4E-4B81-8E2F-3A5C1D9E7F04">
+
+    <!-- ── UI: WiX Standard Bootstrapper Application ───────────────────────── -->
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        Theme="hyperlinkSidebar"
+        ShowVersion="yes"
+        SuppressOptionsUI="yes"
+        SuppressRepair="no"
+        SuppressDowngradeFailure="no" />
+    </BootstrapperApplication>
+
+    <!-- ── JDK 25 detection ─────────────────────────────────────────────────── -->
+    <!--
+      Search for JDK 25 registry keys written by common JDK installers.
+      The first search that succeeds sets JavaInstalled = 1 (exists).
+      Additional searches use After= so they run only when the previous one missed.
+    -->
+
+    <!-- Eclipse Temurin / Adoptium -->
+    <util:RegistrySearch Id="DetectTemurin25"
+                         Variable="JavaInstalled"
+                         Result="exists"
+                         Root="HKLM"
+                         Key="SOFTWARE\Eclipse Adoptium\JDK\25\hotspot\MSI"
+                         Win64="yes" />
+
+    <!-- Microsoft Build of OpenJDK -->
+    <util:RegistrySearch Id="DetectMsftJdk25"
+                         Variable="JavaInstalled"
+                         Result="exists"
+                         Root="HKLM"
+                         Key="SOFTWARE\Microsoft\JDK\25.0\hotspot\MSI"
+                         Win64="yes"
+                         After="DetectTemurin25" />
+
+    <!-- Oracle JDK -->
+    <util:RegistrySearch Id="DetectOracleJdk25"
+                         Variable="JavaInstalled"
+                         Result="exists"
+                         Root="HKLM"
+                         Key="SOFTWARE\JavaSoft\JDK\25"
+                         Win64="yes"
+                         After="DetectMsftJdk25" />
+
+    <!-- ── Install chain ────────────────────────────────────────────────────── -->
+    <Chain>
+
+      <!--
+        Eclipse Temurin JDK 25 — x64 MSI
+        ─────────────────────────────────────
+        • Skipped entirely when any JDK 25 installation is detected above.
+        • The MSI installs JAVA_HOME as a system environment variable and adds
+          java.exe to the system PATH — both required by VorkService.xml.
+        • ADDLOCAL flags:
+            FeatureMain            — core JDK files
+            FeatureEnvironment     — adds java.exe to system PATH
+            FeatureJarFileRunWith  — associates .jar with java.exe
+            FeatureJavaHome        — sets JAVA_HOME system variable  ← required
+
+        To update the JDK version:
+          1. Download the new MSI from https://adoptium.net/releases.html?variant=openjdk25
+          2. Replace JdkMsiPath in build.bat
+          3. Update the DownloadUrl below
+          4. Bump the version numbers in the DownloadUrl
+      -->
+      <MsiPackage Id="TemurinJDK25"
+                  SourceFile="$(var.JdkMsiPath)"
+                  DownloadUrl="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.3%2B9/OpenJDK25U-jdk_x64_windows_hotspot_25.0.3_9.msi"
+                  Vital="yes"
+                  PerMachine="yes"
+                  ForcePerMachine="yes"
+                  DetectCondition="JavaInstalled"
+                  InstallCondition="NOT JavaInstalled"
+                  DisplayName="Eclipse Temurin JDK 25 (x64)">
+        <MsiProperty Name="ADDLOCAL"
+                     Value="FeatureMain,FeatureEnvironment,FeatureJarFileRunWith,FeatureJavaHome" />
+      </MsiPackage>
+
+      <!--
+        Vork AI Server MSI
+        ──────────────────
+        Always installed.  MajorUpgrade in the MSI handles upgrades.
+      -->
+      <MsiPackage Id="VorkMsi"
+                  SourceFile="$(var.MsiPath)"
+                  Vital="yes"
+                  PerMachine="yes"
+                  DisplayName="Vork AI Server" />
+
+    </Chain>
+
+  </Bundle>
+</Wix>

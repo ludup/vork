@@ -55,7 +55,7 @@
     </div>
 
     <!-- Provider cards rendered from server-side model -->
-    <div th:each="group : ${providers}" class="card mb-3" th:id="'card-' + ${group.providerKey()}">
+    <div th:each="group : ${providers}" class="card mb-4" th:id="'card-' + ${group.providerKey()}">
         <div class="card-header d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-2">
                 <span class="fw-semibold" th:text="${group.providerLabel()}"></span>
@@ -122,7 +122,7 @@
                 </div>
 
                 <!-- Enable toggle (not for Gemini) -->
-                <div class="mb-3 form-check" th:unless="${group.providerKey() == 'GEMINI' or group.providerKey() == 'BACKGROUND_SCHEDULER'}">
+                <div class="mb-3 form-switch" th:unless="${group.providerKey() == 'GEMINI' or group.providerKey() == 'BACKGROUND_SCHEDULER'}">
                     <input type="checkbox" class="form-check-input"
                            th:id="'enabled-' + ${group.providerKey()}"
                            th:checked="${group.configured()}">
@@ -145,13 +145,10 @@
         </div>
 
         <!-- Model list summary -->
-        <div class="card-footer text-muted small">
-            <span th:if="${group.configured() and not #lists.isEmpty(group.models())}">
-                <span class="me-2">Available models:</span>
-                <span th:each="m, stat : ${group.models()}">
-                    <span th:text="${m.label()}"></span><span th:unless="${stat.last}">, </span>
-                </span>
-            </span>
+        <div class="card-footer">
+            <div th:if="${group.configured() and not #lists.isEmpty(group.models())}" class="d-flex flex-wrap gap-1">
+                <span th:each="m : ${group.models()}" class="badge bg-secondary" th:text="${m.label()}"></span>
+            </div>
             <span th:if="${group.configured() and #lists.isEmpty(group.models())}">
                 <i class="fa-solid fa-spinner fa-spin me-1"></i>No models discovered yet — try refreshing after saving credentials.
             </span>
@@ -317,8 +314,8 @@
                 const footer = card.querySelector('.card-footer');
                 if (!footer) return;
                 const wrap = document.createElement('div');
-                wrap.className = 'px-3 pb-2';
-                wrap.innerHTML = `<div class="form-check form-switch">
+                wrap.className = 'px-3 py-2';
+                wrap.innerHTML = `<div class="form-switch">
                     <input class="form-check-input" type="checkbox" role="switch"
                            id="transcription-${tp.backedByAiProvider}"
                            data-provider-key="${tp.providerKey}"
@@ -359,7 +356,7 @@
 
     document.addEventListener('DOMContentLoaded', initTranscription);
 </script>
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/vork-modal.js"></script>
 <script src="/js/settings.js"></script>
 </body>
 </html>

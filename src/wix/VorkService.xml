@@ -1,0 +1,68 @@
+<!--
+  WinSW v2 service wrapper configuration for Vork AI Server.
+  https://github.com/winsw/winsw/blob/v2/doc/xmlConfigFile.md
+
+  This file must be named exactly VorkService.xml and placed alongside
+  VorkService.exe (the renamed WinSW-x64.exe) in the Vork install directory.
+
+  Environment variables expanded at runtime:
+    %BASE%       — directory containing VorkService.exe (= install dir)
+    %JAVA_HOME%  — set by the JDK installer (Eclipse Temurin / Oracle / MSFT)
+    %VORK_HOME%  — set by the Vork MSI to the install directory (= %BASE%)
+
+  Vork requires a full JDK (not a bare JRE) because it compiles Java records
+  at runtime using javax.tools.JavaCompiler.  The JAVA_HOME set by Adoptium
+  Temurin always points at a JDK installation with the compiler included.
+-->
+<service>
+
+  <!-- Service identity (must match ServiceInstall/@Name in Product.wxs) -->
+  <id>VorkService</id>
+  <name>Vork AI Server</name>
+  <description>Vork — Multi-provider AI chat with agent automation and session management.</description>
+
+  <!--
+    Launch: %JAVA_HOME%\bin\java.exe
+    The JDK installer (Temurin / Oracle / MSFT) writes JAVA_HOME as a system
+    environment variable.  Using the full path ensures the service picks up the
+    correct JDK even if the system PATH is not fully inherited by the SCM process.
+
+    Heap: -Xms256m / -Xmx1g — adjust to available RAM.
+    The TypeGeneratorService compiles classes in-process; give it at least 512m max.
+
+    conf.d\ is resolved relative to the working directory set below, matching the
+    behaviour described in AGENTS.md (conf.d/database.properties beside the jar).
+  -->
+  <executable>%JAVA_HOME%\bin\java.exe</executable>
+  <arguments>-Xms256m -Xmx1g -jar "%BASE%\vork.jar"</arguments>
+
+  <!-- Working directory: Spring Boot resolves conf.d\ relative to this path -->
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <!--
+    Logging
+    WinSW writes its own wrapper log here (stdout/stderr of the JVM process).
+    Spring Boot / Log4j2 writes application logs wherever application.yml directs.
+  -->
+  <logpath>%BASE%\logs</logpath>
+  <log mode="roll">
+    <!-- Roll at 10 MB; keep 8 files (~80 MB total) -->
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+
+  <!--
+    Restart policy
+    Attempt restart twice (after 10 s and 30 s); give up on the third failure.
+    The failure count resets after 1 hour of clean uptime.
+  -->
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="none" />
+  <resetfailure>1 hour</resetfailure>
+
+  <!-- Start automatically, but delay until other services have settled -->
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+
+</service>
