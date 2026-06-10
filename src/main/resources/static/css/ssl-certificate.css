@@ -4,7 +4,7 @@
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     margin-bottom: 0.1rem;
 }
 
@@ -25,10 +25,10 @@
     margin-right: 6px;
 }
 
-.le-status-idle     { background: var(--bs-secondary); }
-.le-status-active   { background: var(--bs-warning); animation: pulse 1.2s infinite; }
-.le-status-success  { background: var(--bs-success); }
-.le-status-failed   { background: var(--bs-danger); }
+.le-status-idle     { background: var(--vork-muted); }
+.le-status-active   { background: var(--vork-warning); animation: pulse 1.2s infinite; }
+.le-status-success  { background: var(--vork-success); }
+.le-status-failed   { background: var(--vork-danger); }
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -36,6 +36,6 @@
 }
 
 .section-divider {
-    border-color: var(--bs-border-color-translucent);
+    border-color: var(--vork-border);
     margin: 2rem 0;
 }

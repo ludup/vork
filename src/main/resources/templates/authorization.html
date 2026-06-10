@@ -1,70 +1,81 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Authorization Required — Vork</title>
+    <title>Authorize — Vork</title>
     <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="/packages/npm/bootstrap/current/dist/css/bootstrap.min.css">
-    <!-- Custom Vork Theme -->
-    <link rel="stylesheet" href="/css/bootstrap-theme.css">
-    <!-- Font Awesome -->
+    <link rel="stylesheet" href="/css/tailwind.css">
     <link rel="stylesheet" href="/packages/npm.fortawesome/fontawesome-free/current/css/all.min.css">
-    <!-- Authorization stylesheet -->
-    <link rel="stylesheet" href="/css/authorization.css">
+    <link rel="stylesheet" href="/css/vork.css">
+    <style>
+        @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .auth-card { animation: fadeInUp 0.3s ease-out; }
+    </style>
 </head>
-<body>
+<body class="min-h-screen bg-zinc-950 flex items-center justify-center p-4"
+      style="background: radial-gradient(ellipse at top, rgba(20,20,40,0.9) 0%, #0f0f0f 70%)">
 
-    <div class="authorization-container">
-        <div class="authorization-card">
-            <div class="authorization-header">
-                <div class="header-icon">
-                    <i class="fa-solid fa-lock"></i>
-                </div>
-                <h1>Authorization Required</h1>
-                <p class="text-muted">Confirm this action as the currently signed-in user</p>
+<div class="auth-card w-full max-w-lg">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+
+        <!-- Lock icon header -->
+        <div class="flex flex-col items-center pt-8 pb-4 px-8 text-center border-b border-zinc-800">
+            <div class="w-16 h-16 rounded-full border-2 border-[#fdaa02] bg-[rgba(253,170,2,0.08)]
+                        flex items-center justify-center mb-4">
+                <i class="fa-solid fa-lock text-[#fdaa02] text-2xl"></i>
+            </div>
+            <h1 class="text-xl font-bold text-zinc-100 tracking-tight">Authorization Required</h1>
+            <p class="text-zinc-500 text-sm mt-1">Review the action below and approve or deny</p>
+        </div>
+
+        <div class="p-6">
+            <!-- Error alert (hidden by default; shown by authorization.js) -->
+            <div id="errorAlert"
+                 class="d-none flex items-start gap-2 bg-red-950/50 border border-red-800/60 text-red-400 rounded-lg px-3 py-2.5 mb-4 text-sm">
+                <i class="fa-solid fa-circle-exclamation flex-shrink-0 mt-0.5"></i>
+                <span id="errorMessage"></span>
             </div>
 
-            <div class="action-details" id="actionDetails">
-                <!-- Populated by JavaScript -->
+            <!-- Action details populated by authorization.js -->
+            <div id="actionDetails"
+                 class="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 mb-5 text-sm text-zinc-300 leading-relaxed min-h-[60px]">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span>Loading action details&hellip;</span>
+                </div>
             </div>
 
-            <form id="authForm" class="authorization-form">
-                <!-- Error message -->
-                <div class="alert alert-danger alert-dismissible fade show d-none" id="errorAlert" role="alert">
-                    <i class="fa-solid fa-circle-exclamation me-2"></i>
-                    <span id="errorMessage"></span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+            <!-- Authorization form -->
+            <form id="authForm">
+                <input type="hidden" id="authToken" value="">
 
-                <!-- Hidden authorization token -->
-                <input type="hidden" id="authToken" name="token">
-
-                <!-- Action buttons -->
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-success btn-lg">
-                        <i class="fa-solid fa-check-circle me-2"></i>Approve
+                <div class="flex gap-3">
+                    <button type="submit"
+                            class="flex-1 bg-[#51cf66] hover:bg-[#3db958] text-black font-semibold rounded-lg
+                                   px-4 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#51cf66]/40">
+                        <i class="fa-solid fa-check mr-2"></i>Approve
                     </button>
-                    <button type="button" class="btn btn-outline-danger btn-lg" id="denyBtn">
-                        <i class="fa-solid fa-times-circle me-2"></i>Deny
+                    <button type="button" id="denyBtn"
+                            class="flex-1 bg-zinc-800 hover:bg-red-900/60 border border-zinc-700 hover:border-red-700 text-zinc-300 hover:text-red-400
+                                   font-semibold rounded-lg px-4 py-2.5 text-sm transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark mr-2"></i>Deny
                     </button>
                 </div>
             </form>
-
-            <!-- Footer -->
-            <div class="authorization-footer">
-                <p class="text-muted small">
-                    <i class="fa-solid fa-info-circle me-1"></i>If your session has expired, you will be asked to log in before you can decide
-                </p>
-            </div>
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Authorization page script -->
-    <script src="/js/authorization.js"></script>
+    <!-- Footer -->
+    <div class="text-center mt-4">
+        <p class="text-xs text-zinc-700">
+            <img src="/images/Vork-Faviconx128.png" alt="" class="inline w-3.5 h-3.5 mr-1 opacity-40">
+            Secure Vork Authorization
+        </p>
+    </div>
+</div>
 
+<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/authorization.js"></script>
 </body>
 </html>

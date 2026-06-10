@@ -1,91 +1,80 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="${title} + ' — Vork'">Action Required — Vork</title>
+    <title th:text="${title} + ' — Vork'">Input Form — Vork</title>
     <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
-    <link rel="stylesheet" href="/packages/npm/bootstrap/current/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
     <link rel="stylesheet" href="/packages/npm.fortawesome/fontawesome-free/current/css/all.min.css">
-    <style>
-        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .form-card { max-width: 540px; width: 100%; }
-    </style>
+    <link rel="stylesheet" href="/css/vork.css">
 </head>
-<body>
-<div class="container py-5">
-    <div class="card form-card mx-auto shadow">
-        <div class="card-header text-center py-3">
-            <i class="fa-brands fa-telegram fa-2x mb-2 d-block text-info"></i>
-            <h4 class="mb-0" th:text="${title}">Action Required</h4>
+<body class="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+
+<div class="w-full max-w-md">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+
+        <!-- Header -->
+        <div class="flex items-center gap-3 px-5 py-4 border-b border-zinc-800 bg-zinc-900/80">
+            <img src="/images/Vork-Faviconx128.png" alt="Vork" class="w-6 h-6">
+            <div>
+                <div class="font-semibold text-zinc-100 text-sm" th:text="${title}">Input Required</div>
+                <div class="text-zinc-500 text-xs" th:text="${description}"></div>
+            </div>
         </div>
-        <div class="card-body">
-            <p class="text-muted mb-4" th:if="${description != null and !#strings.isEmpty(description)}"
-               th:text="${description}"></p>
 
-            <form th:action="@{'/input-form/' + ${sessionUuid} + '/' + ${eventId}}"
-                  method="post">
-                <input type="hidden" name="token" th:value="${token}">
+        <!-- Form -->
+        <form th:action="@{/input-form/submit}" method="POST" class="p-5">
+            <input type="hidden" name="sessionUuid" th:value="${sessionUuid}">
+            <input type="hidden" name="eventId" th:value="${eventId}">
+            <input type="hidden" name="token" th:value="${token}">
 
-                <!-- Form fields -->
-                <div class="mb-3" th:each="field : ${fields}">
-                    <label class="form-label" th:for="${field.name}" th:text="${field.label}"></label>
+            <div class="space-y-4 mb-6">
+                <th:block th:each="field : ${fields}">
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-300 mb-1.5"
+                               th:for="${field.name}" th:text="${field.label}"></label>
 
-                    <!-- Password field -->
-                    <input th:if="${#strings.equalsIgnoreCase(field.type, 'password')}"
-                           th:id="${field.name}"
-                           th:name="${field.name}"
-                           type="password"
-                           class="form-control"
-                           th:placeholder="${field.placeholder}"
-                           th:required="${field.required}">
+                        <textarea th:if="${field.type == 'TEXTAREA'}"
+                                  th:id="${field.name}" th:name="${field.name}"
+                                  rows="4" th:placeholder="${field.placeholder}"
+                                  class="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm resize-y
+                                         placeholder:text-zinc-600 focus:outline-none focus:border-[#fdaa02] focus:ring-2 focus:ring-[#fdaa02]/25 transition-colors"
+                                  th:text="${field.value}"></textarea>
 
-                    <!-- Select field -->
-                    <select th:if="${#strings.equalsIgnoreCase(field.type, 'select')}"
-                            th:id="${field.name}"
-                            th:name="${field.name}"
-                            class="form-select"
-                            th:required="${field.required}">
-                        <option th:each="opt : ${field.options}"
-                                th:value="${opt.value}"
-                                th:text="${opt.label}"></option>
-                    </select>
+                        <select th:if="${field.type == 'SELECT'}"
+                                th:id="${field.name}" th:name="${field.name}"
+                                class="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm
+                                       focus:outline-none focus:border-[#fdaa02] focus:ring-2 focus:ring-[#fdaa02]/25 transition-colors">
+                            <option th:each="opt : ${field.options}"
+                                    th:value="${opt.value}" th:text="${opt.label}"
+                                    th:selected="${opt.value == field.value}"></option>
+                        </select>
 
-                    <!-- Text / default field -->
-                    <input th:unless="${#strings.equalsIgnoreCase(field.type, 'password') or #strings.equalsIgnoreCase(field.type, 'select')}"
-                           th:id="${field.name}"
-                           th:name="${field.name}"
-                           type="text"
-                           class="form-control"
-                           th:placeholder="${field.placeholder}"
-                           th:value="${field.defaultValue}"
-                           th:required="${field.required}">
-                </div>
+                        <input th:unless="${field.type == 'TEXTAREA' or field.type == 'SELECT'}"
+                               th:type="${field.type == 'PASSWORD' ? 'password' : 'text'}"
+                               th:id="${field.name}" th:name="${field.name}"
+                               th:value="${field.value}" th:placeholder="${field.placeholder}"
+                               class="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm
+                                      placeholder:text-zinc-600 focus:outline-none focus:border-[#fdaa02] focus:ring-2 focus:ring-[#fdaa02]/25 transition-colors">
+                    </div>
+                </th:block>
+            </div>
 
-                <!-- Action buttons (one submit per action) -->
-                <div class="d-grid gap-2 mt-4" th:if="${!#lists.isEmpty(actions)}">
-                    <button th:each="action : ${actions}"
-                            type="submit"
-                            class="btn btn-primary"
-                            name="_action"
-                            th:value="${action.name}"
+            <!-- Action buttons -->
+            <div class="flex gap-2 flex-wrap">
+                <th:block th:each="action : ${actions}">
+                    <button type="submit" th:name="action" th:value="${action.value}"
+                            th:classappend="${action.style == 'danger' ? ' bg-red-700 hover:bg-red-600' :
+                                             action.style == 'success' ? ' bg-[#51cf66] hover:bg-[#3db958] text-black' :
+                                             ' bg-[#fdaa02] hover:bg-[#e89a02] text-black'}"
+                            class="flex-1 min-w-[80px] font-semibold rounded-lg px-4 py-2.5 text-sm transition-colors focus:outline-none"
                             th:text="${action.label}">Submit</button>
-                </div>
-
-                <!-- Fallback single submit if no actions defined -->
-                <div class="d-grid mt-4" th:if="${#lists.isEmpty(actions)}">
-                    <button type="submit" class="btn btn-primary" name="_action" value="ONCE">
-                        Submit
-                    </button>
-                </div>
-            </form>
-        </div>
-        <div class="card-footer text-center text-muted small">
-            This form was sent via Telegram by Vork.
-        </div>
+                </th:block>
+            </div>
+        </form>
     </div>
 </div>
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

@@ -2,17 +2,19 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="backToHome">
-    <div class="mb-3">
-        <a href="/" class="btn btn-outline-secondary btn-sm" title="Back to home" aria-label="Back to home">
-            <i class="fa-solid fa-arrow-left"></i>
+    <div class="mb-4">
+        <a href="/" title="Back to home" aria-label="Back to home"
+           class="inline-flex items-center justify-center w-8 h-8 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 hover:bg-zinc-800 transition-colors no-underline">
+            <i class="fa-solid fa-arrow-left text-sm"></i>
         </a>
     </div>
 </th:block>
 
 <th:block th:fragment="backToSettings">
-    <div class="mb-3">
-        <a href="/settings" class="btn btn-outline-secondary btn-sm" title="Back to settings" aria-label="Back to settings">
-            <i class="fa-solid fa-arrow-left"></i>
+    <div class="mb-4">
+        <a href="/settings" title="Back to settings" aria-label="Back to settings"
+           class="inline-flex items-center justify-center w-8 h-8 rounded border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 hover:bg-zinc-800 transition-colors no-underline">
+            <i class="fa-solid fa-arrow-left text-sm"></i>
         </a>
     </div>
 </th:block>

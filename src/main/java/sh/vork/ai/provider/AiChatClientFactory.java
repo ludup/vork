@@ -6,14 +6,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+
+import com.google.genai.Client;
 
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.config.AiConfig;
@@ -34,16 +37,12 @@ public class AiChatClientFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AiChatClientFactory.class);
 
-    private final Map<AiProvider, ChatClient> baseRegistry;
     private final AiProviderConfigService configService;
 
     /** Cache key = provider:configHash, value = built ChatClient. */
     private final Map<String, ChatClient> cache = new ConcurrentHashMap<>();
 
-    public AiChatClientFactory(
-            @Qualifier("chatClientRegistry") Map<AiProvider, ChatClient> baseRegistry,
-            AiProviderConfigService configService) {
-        this.baseRegistry  = baseRegistry;
+    public AiChatClientFactory(AiProviderConfigService configService) {
         this.configService = configService;
     }
 
@@ -57,7 +56,7 @@ public class AiChatClientFactory {
      */
     public ChatClient getBaseClient(AiProvider provider) {
         return switch (provider) {
-            case GEMINI, BACKGROUND_SCHEDULER -> baseRegistry.get(provider);
+            case GEMINI, BACKGROUND_SCHEDULER -> cachedClient(AiProvider.GEMINI, this::buildGeminiClient);
             case OPENAI  -> cachedClient(provider, this::buildOpenAiClient);
             case OLLAMA  -> cachedClient(provider, this::buildOllamaClient);
             case GROQ    -> cachedClient(provider, this::buildGroqClient);
@@ -164,6 +163,30 @@ public class AiChatClientFactory {
                     .build();
         } catch (Exception ex) {
             log.error("Failed to build Ollama ChatClient: {}", ex.getMessage(), ex);
+            return null;
+        }
+    }
+
+    private ChatClient buildGeminiClient(AiProviderConfig config) {
+        try {
+            String apiKey = configService.decryptApiKey(config.apiKey());
+            if (apiKey == null || apiKey.isBlank()) {
+                log.warn("Gemini API key is blank — cannot build client");
+                return null;
+            }
+            Client client = Client.builder().apiKey(apiKey).build();
+            GoogleGenAiChatOptions opts = GoogleGenAiChatOptions.builder()
+                    .model(defaultModel(config, "gemini-2.5-flash"))
+                    .build();
+            GoogleGenAiChatModel model = GoogleGenAiChatModel.builder()
+                    .genAiClient(client)
+                    .defaultOptions(opts)
+                    .build();
+            return ChatClient.builder(model)
+                    .defaultSystem(AiConfig.BASE_SYSTEM_PROMPT)
+                    .build();
+        } catch (Exception ex) {
+            log.error("Failed to build Gemini ChatClient: {}", ex.getMessage(), ex);
             return null;
         }
     }

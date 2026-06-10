@@ -775,7 +775,7 @@ public class VirtualSshService extends AbstractSshServer {
 		String formattedHostKey;
 		try {
 			formattedHostKey = SshKeyUtils.getFormattedKey(currentKey, "Vork SSH Host Key");
-		} catch (SshException e) {
+		} catch (IOException e) {
 			return "Failed to format host key: " + e.getMessage();
 		}
 
@@ -805,19 +805,18 @@ public class VirtualSshService extends AbstractSshServer {
 		}
 
 		// Test the connection — connect, authenticate, then immediately close
-		SshClientContext context = new SshClientContext();
-		context.setUsername(username);
-		final String capturedHostKey = formattedHostKey;
-		context.setHostKeyVerification((h, pk) -> {
-			try {
-				return SshKeyUtils.getPublicKey(capturedHostKey).equals(pk);
-			} catch (IOException e) {
-				log.error("Host key mismatch during create-connection test [node={}]: {}", node.uuid(), e.getMessage());
-				return false;
-			}
-		});
-
 		try {
+			SshClientContext context = new SshClientContext();
+			context.setUsername(username);
+			final String capturedHostKey = formattedHostKey;
+			context.setHostKeyVerification((h, pk) -> {
+				try {
+					return SshKeyUtils.getPublicKey(capturedHostKey).equals(pk);
+				} catch (IOException e) {
+					log.error("Host key mismatch during create-connection test [node={}]: {}", node.uuid(), e.getMessage());
+					return false;
+				}
+			});
 			SshClient client = SshClientBuilder.create()
 					.withTarget(normalizedHostname, port)
 					.withUsername(username)
@@ -846,7 +845,7 @@ public class VirtualSshService extends AbstractSshServer {
 			} finally {
 				try { client.close(); } catch (IOException ignored) {}
 			}
-		} catch (IOException | SshException e) {
+		} catch (IOException | SshException | InterruptedException e) {
 			log.warn("SSH connection test failed [node={}]: {}", pendingNodeUuid, e.getMessage());
 			return "Connection test failed — " + e.getMessage();
 		}

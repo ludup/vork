@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup — Vork</title>
     <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
-    <link rel="stylesheet" href="/packages/npm/bootstrap/current/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/css/bootstrap-theme.css">
-    <link rel="stylesheet" href="/packages/npm.fortawesome/fontawesome-free/current/css/all.min.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/vork.css">
     <script src="/packages/npm/qrious/current/dist/qrious.min.js"></script>
     <style>
         body { background: var(--bs-body-bg); }
@@ -38,23 +38,29 @@
         }
         .step-dot.active  { background: #0d6efd; color: #fff; border-color: #0d6efd; }
         .step-dot.done    { background: #198754; color: #fff; border-color: #198754; }
-        .step-line        { flex: 1; height: 2px; background: var(--bs-border-color); max-width: 100px; }
+        .step-line        { flex: 1; height: 2px; background: var(--vork-border); max-width: 100px; }
         .step-panel       { display: none; }
         .step-panel.active { display: block; }
         .provider-btn {
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
-            border: 1px solid var(--bs-border-color);
+            border: 1px solid rgba(253, 170, 2, 0.35) !important;
+            border-radius: 6px !important;
         }
-        .provider-btn:hover  { border-color: var(--bs-primary) !important; }
+        .provider-btn:hover  { border-color: var(--vork-primary) !important; }
         .provider-btn.selected {
-            border-color: #0d6efd !important;
-            background: rgba(13, 110, 253, 0.12) !important;
+            border-color: var(--vork-primary) !important;
+            background: var(--vork-primary-subtle) !important;
         }
-        .feature-list li { padding: 0.3rem 0; }
+        .feature-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; }
+        .provider-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
     </style>
 </head>
-<body>
+<body class="bg-zinc-950 text-zinc-100">
 <div class="setup-wrapper">
     <div class="setup-card">
 
@@ -125,27 +131,42 @@
 
                     <!-- Provider selection -->
                     <label class="form-label">Select Provider</label>
-                    <div class="d-flex gap-2 mb-3">
-                        <div class="card provider-btn flex-fill text-center p-2 rounded" onclick="selectProvider('GEMINI')" id="btn-GEMINI">
+                    <div class="provider-grid mb-3">
+                        <div class="card provider-btn text-center p-2 rounded" onclick="selectProvider('GEMINI')" id="btn-GEMINI">
                             <div class="fw-semibold small">Gemini</div>
                             <div class="text-muted" style="font-size:0.7rem">Google</div>
                         </div>
-                        <div class="card provider-btn flex-fill text-center p-2 rounded" onclick="selectProvider('OPENAI')" id="btn-OPENAI">
+                        <div class="card provider-btn text-center p-2 rounded" onclick="selectProvider('OPENAI')" id="btn-OPENAI">
                             <div class="fw-semibold small">ChatGPT</div>
                             <div class="text-muted" style="font-size:0.7rem">OpenAI</div>
                         </div>
-                        <div class="card provider-btn flex-fill text-center p-2 rounded" onclick="selectProvider('OLLAMA')" id="btn-OLLAMA">
+                        <div class="card provider-btn text-center p-2 rounded" onclick="selectProvider('GROQ')" id="btn-GROQ">
+                            <div class="fw-semibold small">Groq</div>
+                            <div class="text-muted" style="font-size:0.7rem">Fast inference</div>
+                        </div>
+                        <div class="card provider-btn text-center p-2 rounded" onclick="selectProvider('OLLAMA')" id="btn-OLLAMA">
                             <div class="fw-semibold small">Ollama</div>
                             <div class="text-muted" style="font-size:0.7rem">Local</div>
                         </div>
                     </div>
 
-                    <!-- Gemini config (pre-configured via application.yml) -->
+                    <!-- Gemini config -->
                     <div id="config-GEMINI" class="provider-config d-none">
-                        <div class="alert alert-info small py-2 mb-3">
-                            <i class="fa-solid fa-circle-info me-1"></i>
-                            Gemini is pre-configured in <code>application.yml</code>.
-                            Click <strong>Test Connection</strong> to verify.
+                        <div class="mb-3">
+                            <label class="form-label" for="apiKey-GEMINI">Gemini API Key</label>
+                            <input type="password" id="apiKey-GEMINI" class="form-control"
+                                   placeholder="AIza…" autocomplete="off">
+                            <div class="form-text">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>.</div>
+                        </div>
+                    </div>
+
+                    <!-- Groq config -->
+                    <div id="config-GROQ" class="provider-config d-none">
+                        <div class="mb-3">
+                            <label class="form-label" for="apiKey-GROQ">Groq API Key</label>
+                            <input type="password" id="apiKey-GROQ" class="form-control"
+                                   placeholder="gsk_…" autocomplete="off">
+                            <div class="form-text">Get a free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a>.</div>
                         </div>
                     </div>
 
@@ -214,7 +235,7 @@
                         <i class="fa-solid fa-circle-info me-1"></i>
                         No notification providers are available in this build.
                     </div>
-                    <div id="np-provider-cards" class="d-flex flex-wrap gap-2 mb-3 d-none"></div>
+                    <div id="np-provider-cards" class="provider-grid mb-3 d-none"></div>
                     <div id="np-form-wrap" class="d-none">
                         <div class="mb-3">
                             <label class="form-label" for="np-display-name">
@@ -622,7 +643,6 @@
         notifProviderTypes.forEach(function (p) {
             const div = document.createElement('div');
             div.className = 'card provider-btn text-center p-2 rounded';
-            div.style.minWidth = '90px';
             div.id = 'np-btn-' + p.providerKey;
             div.innerHTML = '<div>' + notifProviderIcon(p.providerKey) + '</div>'
                           + '<div class="fw-semibold small mt-1">' + escapeHtml(p.displayName) + '</div>';
@@ -823,11 +843,8 @@
         }
     }
 
-    // On load: auto-select Gemini if its API key is pre-configured in application.yml
-    fetch('/api/setup/status')
-        .then(function(r) { return r.json(); })
-        .then(function(s) { if (s.geminiApiKeyConfigured) selectProvider('GEMINI'); })
-        .catch(function() {});
+    // On load: no auto-selection — user must choose a provider
+    fetch('/api/setup/status').catch(function() {});
 </script>
 <script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
 </body>

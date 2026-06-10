@@ -120,8 +120,8 @@ public class AiModelController {
         if (aiProvider == null) {
             return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", "Unknown provider: " + provider));
         }
-        if (aiProvider == AiProvider.GEMINI || aiProvider == AiProvider.BACKGROUND_SCHEDULER) {
-            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", "Cannot remove config for built-in provider"));
+        if (aiProvider == AiProvider.BACKGROUND_SCHEDULER) {
+            return ResponseEntity.badRequest().body(Map.of("status", "ERROR", "message", "Cannot remove config for internal provider"));
         }
         configService.deleteConfig(aiProvider);
         clientFactory.invalidate(aiProvider);

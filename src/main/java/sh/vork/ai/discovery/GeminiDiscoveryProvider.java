@@ -6,10 +6,13 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import sh.vork.ai.AiProvider;
+import sh.vork.ai.provider.AiProviderConfig;
+import sh.vork.ai.provider.AiProviderConfigService;
 
 /**
  * Discovers available Gemini models via
@@ -26,12 +29,12 @@ public class GeminiDiscoveryProvider implements ModelDiscoveryProvider {
     private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
     private final RestClient restClient;
-    private final String apiKey;
+    private final AiProviderConfigService configService;
 
     public GeminiDiscoveryProvider(RestClient.Builder restClientBuilder,
-                                   @Value("${spring.ai.google.genai.api-key:}") String apiKey) {
-        this.restClient = restClientBuilder.baseUrl(BASE_URL).build();
-        this.apiKey     = apiKey;
+                                   AiProviderConfigService configService) {
+        this.restClient    = restClientBuilder.baseUrl(BASE_URL).build();
+        this.configService = configService;
     }
 
     /**
@@ -98,8 +101,14 @@ public class GeminiDiscoveryProvider implements ModelDiscoveryProvider {
     @Override
     @SuppressWarnings("unchecked")
     public List<DiscoveredModel> discoverModels() {
-        if (apiKey == null || apiKey.isBlank()) {
+        AiProviderConfig cfg = configService.getConfig(AiProvider.GEMINI);
+        if (cfg == null || cfg.apiKey() == null || cfg.apiKey().isBlank()) {
             log.debug("Gemini: no API key configured, skipping discovery");
+            return List.of();
+        }
+        String apiKey = configService.decryptApiKey(cfg.apiKey());
+        if (apiKey == null || apiKey.isBlank()) {
+            log.debug("Gemini: API key could not be decrypted, skipping discovery");
             return List.of();
         }
         log.debug("Gemini: discovering models");

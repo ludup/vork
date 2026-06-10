@@ -34,7 +34,7 @@ body {
 
 .chat-sidebar {
     width: 280px;
-    border-right: 1px solid var(--bs-border-color);
+    border-right: 1px solid var(--vork-border);
     background: linear-gradient(180deg, rgba(30, 33, 38, 0.95), rgba(20, 22, 26, 0.98));
     padding: 0.75rem 0.65rem;
     display: flex;
@@ -57,7 +57,7 @@ body {
 
 .sidebar-section-title {
     font-size: 0.72rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 0 0.2rem;
@@ -78,8 +78,8 @@ body {
     gap: 0.25rem;
     width: 100%;
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--bs-border-color);
-    color: var(--bs-body-color);
+    border: 1px solid var(--vork-border);
+    color: var(--vork-text);
     border-radius: 0.55rem;
     padding: 0.25rem;
     text-align: left;
@@ -101,29 +101,29 @@ body {
     border: none;
     border-radius: 0.4rem;
     background: transparent;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     flex-shrink: 0;
 }
 
 .chat-session-rename:hover {
-    color: var(--bs-primary);
+    color: var(--vork-primary);
     background: rgba(253, 170, 2, 0.12);
 }
 
 .chat-session-rename-save {
-    color: var(--bs-success);
+    color: var(--vork-success);
 }
 
 .chat-session-rename-cancel {
-    color: var(--bs-danger);
+    color: var(--vork-danger);
 }
 
 .chat-session-rename-input {
     flex: 1;
     min-width: 0;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     background: rgba(255, 255, 255, 0.04);
-    color: var(--bs-body-color);
+    color: var(--vork-text);
     border-radius: 0.4rem;
     padding: 0.25rem 0.45rem;
     font-size: 0.86rem;
@@ -131,17 +131,17 @@ body {
 
 .chat-session-rename-input:focus {
     outline: none;
-    border-color: var(--bs-primary);
+    border-color: var(--vork-primary);
     box-shadow: 0 0 0 0.15rem rgba(253, 170, 2, 0.2);
 }
 
 .chat-session-item:hover {
-    border-color: var(--bs-primary);
+    border-color: var(--vork-primary);
     background: rgba(253, 170, 2, 0.08);
 }
 
 .chat-session-item.active {
-    border-color: var(--bs-primary);
+    border-color: var(--vork-primary);
     background: rgba(253, 170, 2, 0.16);
 }
 
@@ -158,11 +158,11 @@ body {
     display: block;
     margin-top: 0.1rem;
     font-size: 0.7rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
 }
 
 .chat-session-empty {
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     font-size: 0.82rem;
     padding: 0.4rem 0.25rem;
 }
@@ -198,8 +198,8 @@ body.sidebar-collapsed .sidebar-top {
 .chat-header {
     flex-shrink: 0;
     padding: 0.65rem 1.25rem;
-    border-bottom: 1px solid var(--bs-border-color);
-    background-color: var(--bs-body-bg);
+    border-bottom: 1px solid var(--vork-border);
+    background-color: var(--vork-bg);
 }
 
 .header-logo {
@@ -309,19 +309,19 @@ body.sidebar-collapsed .sidebar-top {
 }
 
 .bubble.user {
-    background-color: var(--bs-primary);
+    background-color: var(--vork-primary);
     color: #fff;
     border-bottom-right-radius: 0.3rem;
 }
 
 .bubble.assistant {
-    background-color: var(--bs-secondary-bg);
+    background-color: var(--vork-surface);
     border-bottom-left-radius: 0.3rem;
 }
 
 .bubble.error {
-    background-color: var(--bs-danger-bg-subtle);
-    color: var(--bs-danger-text-emphasis);
+    background-color: rgba(255,107,107,0.12);
+    color: var(--vork-danger);
     border-bottom-left-radius: 0.3rem;
 }
 
@@ -338,7 +338,7 @@ body.sidebar-collapsed .sidebar-top {
     justify-content: center;
     gap: 0.4rem;
     padding: 0.15rem 0 0.15rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     font-size: 0.76rem;
     opacity: 0.75;
     user-select: none;
@@ -359,14 +359,14 @@ body.sidebar-collapsed .sidebar-top {
 
 .prompt-meta {
     font-size: 0.82rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     margin-bottom: 0.2rem;
 }
 
 .prompt-reasoning {
     margin-top: 0.35rem;
     margin-bottom: 0.45rem;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     border-radius: 0.45rem;
     background: rgba(255, 255, 255, 0.02);
 }
@@ -375,7 +375,7 @@ body.sidebar-collapsed .sidebar-top {
     cursor: pointer;
     list-style: none;
     padding: 0.45rem 0.65rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     font-size: 0.86rem;
     user-select: none;
 }
@@ -409,14 +409,14 @@ body.sidebar-collapsed .sidebar-top {
 
 .prompt-args-inline-label {
     margin-top: 0.2rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     font-size: 0.86rem;
 }
 
 .prompt-args-toggle {
     margin-top: 0.15rem;
     margin-bottom: 0.35rem;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     border-radius: 0.45rem;
     background: rgba(255, 255, 255, 0.02);
 }
@@ -425,7 +425,7 @@ body.sidebar-collapsed .sidebar-top {
     cursor: pointer;
     list-style: none;
     padding: 0.45rem 0.65rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     font-size: 0.86rem;
     user-select: none;
 }
@@ -492,7 +492,7 @@ body.sidebar-collapsed .sidebar-top {
     width: 1.9rem;
     height: 1.9rem;
     border-radius: 999px;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -502,8 +502,8 @@ body.sidebar-collapsed .sidebar-top {
 }
 
 .terminal-status-running {
-    color: var(--bs-secondary-color);
-    border-color: var(--bs-border-color);
+    color: var(--vork-muted);
+    border-color: var(--vork-border);
 }
 
 .terminal-status-done {
@@ -549,19 +549,19 @@ body.sidebar-collapsed .sidebar-top {
     width: 1.9rem;
     height: 1.9rem;
     border-radius: 999px;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     text-decoration: none;
     background: rgba(255, 255, 255, 0.03);
     transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .terminal-stream-attachment-btn:hover {
-    color: var(--bs-body-color);
-    border-color: var(--bs-secondary-color);
+    color: var(--vork-text);
+    border-color: var(--vork-muted);
     background: rgba(255, 255, 255, 0.08);
 }
 
@@ -575,13 +575,13 @@ body.sidebar-collapsed .sidebar-top {
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
     cursor: pointer;
     transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .terminal-stream-toggle:hover:not(:disabled) {
-    color: var(--bs-body-color);
+    color: var(--vork-text);
     background: rgba(255, 255, 255, 0.08);
 }
 
@@ -640,9 +640,9 @@ body.sidebar-collapsed .sidebar-top {
 }
 
 .bubble blockquote {
-    border-left: 3px solid var(--bs-border-color);
+    border-left: 3px solid var(--vork-border);
     padding-left: 0.75rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
 }
 
 .bubble table {
@@ -653,12 +653,12 @@ body.sidebar-collapsed .sidebar-top {
 
 .bubble th,
 .bubble td {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     padding: 0.3rem 0.6rem;
 }
 
 .bubble th {
-    background: var(--bs-tertiary-bg);
+    background: var(--vork-surface-2);
 }
 
 /* ── Avatar ───────────────────────────────────────────────────────────────── */
@@ -675,12 +675,12 @@ body.sidebar-collapsed .sidebar-top {
 }
 
 .avatar.user {
-    background-color: var(--bs-primary);
+    background-color: var(--vork-primary);
     color: #fff;
 }
 
 .avatar.assistant {
-    background-color: var(--bs-secondary);
+    background-color: var(--vork-muted);
     color: #fff;
 }
 
@@ -694,7 +694,7 @@ body.sidebar-collapsed .sidebar-top {
     display: inline-block;
     width: 0.45rem;
     height: 0.45rem;
-    background: var(--bs-secondary-color);
+    background: var(--vork-muted);
     border-radius: 50%;
     margin: 0 0.1rem;
     animation: bounce 1.2s infinite;
@@ -723,15 +723,15 @@ body.sidebar-collapsed .sidebar-top {
 }
 
 .status-dot.connected {
-    background: var(--bs-success);
+    background: var(--vork-success);
 }
 
 .status-dot.disconnected {
-    background: var(--bs-danger);
+    background: var(--vork-danger);
 }
 
 .status-dot.connecting {
-    background: var(--bs-warning);
+    background: var(--vork-warning);
     animation: pulse 1s infinite;
 }
 
@@ -745,8 +745,8 @@ body.sidebar-collapsed .sidebar-top {
 .chat-input-area {
     flex-shrink: 0;
     padding: 0.75rem 1rem 0.6rem;
-    border-top: 1px solid var(--bs-border-color);
-    background-color: var(--bs-body-bg);
+    border-top: 1px solid var(--vork-border);
+    background-color: var(--vork-bg);
 }
 
 #message-input {
@@ -791,8 +791,8 @@ body.sidebar-collapsed .sidebar-top {
     width: 80px;
     height: 80px;
     border-radius: 0.5rem;
-    border: 1px solid var(--bs-border-color);
-    background-color: var(--bs-secondary-bg);
+    border: 1px solid var(--vork-border);
+    background-color: var(--vork-surface);
     overflow: hidden;
     flex-shrink: 0;
     display: flex;
@@ -813,12 +813,12 @@ body.sidebar-collapsed .sidebar-top {
 /* Icon chips show the icon + filename */
 .attach-chip .chip-icon {
     font-size: 1.6rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
 }
 
 .attach-chip .chip-label {
     font-size: 0.58rem;
-    color: var(--bs-body-color);
+    color: var(--vork-text);
     text-align: center;
     max-width: 72px;
     overflow: hidden;
@@ -861,7 +861,7 @@ body.sidebar-collapsed .sidebar-top {
 }
 
 .attach-chip .chip-remove:hover {
-    background: var(--bs-danger);
+    background: var(--vork-danger);
 }
 
 /* Warning badge for unsupported types */
@@ -870,7 +870,7 @@ body.sidebar-collapsed .sidebar-top {
     bottom: 2px;
     left: 2px;
     font-size: 0.65rem;
-    color: var(--bs-warning);
+    color: var(--vork-warning);
     z-index: 2;
 }
 
@@ -907,10 +907,10 @@ body.sidebar-collapsed .sidebar-top {
     padding: 0.25rem 0.6rem;
     border-radius: 0.35rem;
     background: rgba(255, 255, 255, 0.08);
-    color: var(--bs-body-color);
+    color: var(--vork-text);
     text-decoration: none;
     font-size: 0.8rem;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--vork-border);
     max-width: 200px;
     overflow: hidden;
     white-space: nowrap;
@@ -919,7 +919,7 @@ body.sidebar-collapsed .sidebar-top {
 
 .bubble-file-link:hover {
     background: rgba(255, 255, 255, 0.14);
-    color: var(--bs-body-color);
+    color: var(--vork-text);
 }
 
 /* ── Lightbox overlay ─────────────────────────────────────────────────────── */

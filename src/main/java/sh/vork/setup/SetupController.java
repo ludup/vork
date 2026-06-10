@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,6 +24,7 @@ import jakarta.servlet.http.HttpSession;
 import sh.vork.ai.AiProvider;
 import sh.vork.ai.discovery.DiscoveredModel;
 import sh.vork.ai.discovery.ModelDiscoveryOrchestrator;
+import sh.vork.ai.provider.AiChatClientFactory;
 import sh.vork.ai.provider.AiProviderConfigService;
 
 /**
@@ -42,20 +42,20 @@ public class SetupController {
 
     private final SetupService              setupService;
     private final AiProviderConfigService   configService;
+    private final AiChatClientFactory       clientFactory;
     private final ModelDiscoveryOrchestrator orchestrator;
     private final SystemSettingsService     systemSettingsService;
     private final AuthenticationManager     authenticationManager;
 
-    @Value("${spring.ai.google.genai.api-key:}")
-    private String geminiApiKey;
-
     public SetupController(SetupService setupService,
                            AiProviderConfigService configService,
+                           AiChatClientFactory clientFactory,
                            ModelDiscoveryOrchestrator orchestrator,
                            SystemSettingsService systemSettingsService,
                            AuthenticationManager authenticationManager) {
         this.setupService          = setupService;
         this.configService         = configService;
+        this.clientFactory         = clientFactory;
         this.orchestrator          = orchestrator;
         this.systemSettingsService = systemSettingsService;
         this.authenticationManager = authenticationManager;
@@ -80,7 +80,7 @@ public class SetupController {
     public Map<String, Object> status() {
         return Map.of(
                 "setupRequired",          setupService.isSetupRequired(),
-                "geminiApiKeyConfigured",  geminiApiKey != null && !geminiApiKey.isBlank()
+                "geminiApiKeyConfigured",  configService.getConfig(AiProvider.GEMINI) != null
         );
     }
 
@@ -129,9 +129,8 @@ public class SetupController {
             return ResponseEntity.badRequest().body(Map.of("error", "Unknown provider: " + req.provider()));
         }
         // Persist credentials so the discovery provider can pick them up
-        if (provider != AiProvider.GEMINI) {
-            configService.saveConfig(provider, req.apiKey(), req.baseUrl(), null, true);
-        }
+        configService.saveConfig(provider, req.apiKey(), req.baseUrl(), null, true);
+        clientFactory.invalidate(provider);
         orchestrator.invalidate(provider.name().toLowerCase());
         List<DiscoveredModel> models = orchestrator.discoverForProvider(provider.name().toLowerCase());
         if (models.isEmpty()) {
@@ -153,12 +152,7 @@ public class SetupController {
         if (provider == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Unknown provider: " + req.provider()));
         }
-        if (provider != AiProvider.GEMINI) {
-            configService.saveConfig(provider, req.apiKey(), req.baseUrl(), req.defaultModel(), true);
-        } else {
-            // For Gemini, only save the chosen default model (key stays in yml)
-            configService.saveConfig(provider, null, null, req.defaultModel(), true);
-        }
+        configService.saveConfig(provider, req.apiKey(), req.baseUrl(), req.defaultModel(), true);
         if (req.setAsGlobal() && req.defaultModel() != null && !req.defaultModel().isBlank()) {
             systemSettingsService.setGlobal(provider.name(), req.defaultModel());
         }

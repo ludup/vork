@@ -2,14 +2,11 @@ spring:
   ai:
     google:
       genai:
-        # Set GEMINI_API_KEY environment variable, or replace the default below.
-        # Get a key at https://aistudio.google.com/app/apikey
-        api-key: AIzaSyBETFkkMz1qyNsK6VOQM1F1D8j8sH7wGwc
+        # Default model used when building the Gemini client programmatically.
+        # API key is stored via the Vork setup UI and never required at startup.
         chat:
           options:
             model: gemini-2.5-flash
-            thinking-budget: 0
-            include-thoughts: false
 
   # Thymeleaf configuration for login and authorization pages
   thymeleaf:

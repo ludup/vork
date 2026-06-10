@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.Bean;
@@ -140,42 +139,11 @@ public class AiConfig {
     }
 
     // -------------------------------------------------------------------------
-    // ChatClient beans - one per active provider
+    // ChatClient beans
     // -------------------------------------------------------------------------
-
-    /**
-     * Gemini ChatClient.
-     *
-     * <p>
-     * {@link ChatClient.Builder} is auto-configured by
-     * {@code spring-ai-starter-model-google-genai} and already wraps the
-     * Google GenAI {@code ChatModel}. We attach the weather tool as a default
-     * so every prompt sent through this client can trigger it automatically.
-     *
-     * <p>
-     * When a second provider is added, inject its specific {@code ChatModel}
-     * directly rather than relying on {@code ChatClient.Builder} auto-injection
-     * to avoid ambiguity:
-     * 
-     * <pre>{@code
-     * @Bean
-     * public ChatClient openAiChatClient(OpenAiChatModel openAiModel,
-     *         ToolCallback getCurrentWeather) {
-     *     return ChatClient.builder(openAiModel)
-     *             .defaultToolCallbacks(getCurrentWeather)
-     *             .build();
-* }
-     * }</pre>
-     */
-    @Bean
-    public ChatClient geminiChatClient(ChatClient.Builder chatClientBuilder) {
-        // Tools are NOT registered here. AiOrchestrationService.buildMutatedClient()
-        // injects the full secured tool set (or a per-agent filtered subset) on every
-        // request to avoid duplicate-tool errors when mutating the builder.
-        return chatClientBuilder
-                .defaultSystem(BASE_SYSTEM_PROMPT)
-                .build();
-    }
+    // All providers (Gemini, OpenAI, Ollama, Groq) are built programmatically
+    // by AiChatClientFactory from credentials stored via the setup UI.
+    // No auto-configured ChatClient beans are needed here.
 
     private static boolean isRestrictedTool(ConfigurableListableBeanFactory beanFactory, String toolName) {
         return readBeanMethodAnnotation(beanFactory, toolName, Restricted.class) != null;
@@ -212,24 +180,13 @@ public class AiConfig {
     }
 
     // -------------------------------------------------------------------------
-    // Provider registry
+    // Provider registry (always empty at startup — AiChatClientFactory builds
+    // clients lazily from credentials stored via the setup UI)
     // -------------------------------------------------------------------------
 
-    /**
-     * Central routing table: {@link AiProvider} to {@link ChatClient}.
-     *
-     * <p>
-     * This is the only place that needs to change when a new provider is added.
-     */
     @Bean
-    public Map<AiProvider, ChatClient> chatClientRegistry(
-            @Qualifier("geminiChatClient") ChatClient geminiChatClient) {
-        return Map.of(
-            AiProvider.GEMINI, geminiChatClient,
-            AiProvider.BACKGROUND_SCHEDULER, geminiChatClient
-        // AiProvider.OPENAI, openAiChatClient,
-        // AiProvider.ANTHROPIC, anthropicChatClient
-        );
+    public Map<AiProvider, ChatClient> chatClientRegistry() {
+        return new LinkedHashMap<>();
     }
 
     // -------------------------------------------------------------------------

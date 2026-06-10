@@ -1,33 +1,38 @@
-<header class="d-flex align-items-center justify-content-between py-2 px-3 border-bottom">
-    <div class="d-flex align-items-center gap-3">
-        <a href="/" class="navbar-brand d-flex align-items-center">
-            <img src="/images/Vork-Faviconx128.png" alt="Vork" width="32" height="32" class="me-2">
-            <span class="fw-bold text-gold">Vork</span>
+<header class="flex items-center justify-between px-4 py-2 bg-zinc-950 border-b border-zinc-800">
+    <a href="/" class="flex items-center gap-2 no-underline group">
+        <img src="/images/Vork-Faviconx128.png" alt="Vork" width="28" height="28">
+        <span class="font-bold text-[#fdaa02] text-base tracking-tight">Vork</span>
+    </a>
+    <nav class="flex items-center gap-1">
+        <a href="/notifications" title="My Notifications"
+           class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            <i class="fa-solid fa-bell text-sm"></i>
         </a>
-    </div>
-    <div class="d-flex align-items-center gap-2">
-        <a href="/notifications" class="btn btn-outline-secondary btn-sm" title="My Notifications">
-            <i class="fa-solid fa-bell"></i>
+        <a href="/agents" title="Agents"
+           class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            <i class="fa-solid fa-robot text-sm"></i>
         </a>
-        <a href="/agents" class="btn btn-outline-secondary btn-sm" title="Agents">
-            <i class="fa-solid fa-robot"></i>
+        <a href="/jobs" title="Jobs"
+           class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            <i class="fa-solid fa-clock-rotate-left text-sm"></i>
         </a>
-        <a href="/jobs" class="btn btn-outline-secondary btn-sm" title="Jobs">
-            <i class="fa-solid fa-clock-rotate-left"></i>
+        <a href="/pending-sessions" title="Pending Input"
+           class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            <i class="fa-solid fa-inbox text-sm"></i>
         </a>
-        <a href="/pending-sessions" class="btn btn-outline-secondary btn-sm" title="Pending Input">
-            <i class="fa-solid fa-inbox"></i>
+        <a href="/data-inspector" title="Data Inspector"
+           class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            <i class="fa-solid fa-table-list text-sm"></i>
         </a>
-        <a href="/data-inspector" class="btn btn-outline-secondary btn-sm" title="Data Inspector">
-            <i class="fa-solid fa-table-list"></i>
+        <a href="/settings" title="Settings"
+           class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            <i class="fa-solid fa-gear text-sm"></i>
         </a>
-        <a href="/settings" class="btn btn-outline-secondary btn-sm" title="Settings">
-            <i class="fa-solid fa-gear"></i>
-        </a>
-        <form id="logout-form" method="post" action="/logout" class="d-inline">
-            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Logout">
-                <i class="fa-solid fa-right-from-bracket"></i>
+        <form id="logout-form" method="post" action="/logout" class="contents">
+            <button type="submit" title="Logout"
+                    class="w-8 h-8 flex items-center justify-center rounded text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors border-0 bg-transparent cursor-pointer">
+                <i class="fa-solid fa-right-from-bracket text-sm"></i>
             </button>
         </form>
-    </div>
+    </nav>
 </header>

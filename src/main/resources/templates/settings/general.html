@@ -1,41 +1,44 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>General Settings — Vork</title>
     <link rel="icon" type="image/png" href="/images/Vork-Faviconx128.png">
-    <link rel="stylesheet" href="/packages/npm/bootstrap/current/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/css/bootstrap-theme.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
     <link rel="stylesheet" href="/packages/npm.fortawesome/fontawesome-free/current/css/all.min.css">
-    <link rel="stylesheet" href="/css/settings.css">
+    <link rel="stylesheet" href="/css/vork.css">
 </head>
-<body>
-<div class="container py-5" style="max-width: 700px;">
+<body class="bg-zinc-950 text-zinc-100">
+<div class="max-w-2xl mx-auto px-4 py-8">
     <div th:replace="~{fragments/settings-navigation :: backToSettings}"></div>
-    <h2 class="mb-1"><i class="fa-solid fa-sliders me-2"></i>General</h2>
-    <p class="text-muted mb-4">Application base URL and system-wide defaults.</p>
+    <h2 class="text-xl font-bold mb-1 flex items-center gap-2">
+        <i class="fa-solid fa-sliders text-[#fdaa02]"></i> General
+    </h2>
+    <p class="text-zinc-500 text-sm mb-6">Application base URL and system-wide defaults.</p>
 
-    <div id="alert-area"></div>
+    <div id="alert-area" class="mb-4"></div>
 
-    <div class="card mb-4 border-primary">
-        <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-solid fa-globe text-primary"></i>
-            <span class="fw-semibold">Application Base URL</span>
+    <!-- Base URL card -->
+    <div class="bg-zinc-900 border border-[#fdaa02]/40 rounded-xl mb-4 overflow-hidden">
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+            <i class="fa-solid fa-globe text-[#fdaa02]"></i>
+            <span class="font-semibold text-sm">Application Base URL</span>
         </div>
-        <div class="card-body">
-            <p class="text-muted small mb-3">
-                The public-facing base URL of this Vork instance (e.g. <code>https://my.vork.app</code>).
-                Used to generate authorization form links for out-of-band approvals.<br>
-                <strong>Leave blank</strong> to route through the public zero-knowledge relay at
-                <code>relay.vork.sh</code> — no firewall changes required.<br>
-                <strong>Set to your appliance URL</strong> to use the relay built directly into Vork.
-                The appliance hosts the same encrypted relay protocol; you must open HTTPS to it from the internet.
-                See <a href="https://github.com/ludup/vork-relay" target="_blank">vork-relay</a> for the
+        <div class="p-4">
+            <p class="text-zinc-500 text-xs leading-relaxed mb-4">
+                The public-facing base URL of this Vork instance (e.g. <code class="text-[#fdaa02] bg-zinc-800 px-1 rounded text-xs">https://my.vork.app</code>).
+                Used to generate authorization form links for out-of-band approvals.<br><br>
+                <strong class="text-zinc-300">Leave blank</strong> to route through the public zero-knowledge relay at
+                <code class="text-[#fdaa02] bg-zinc-800 px-1 rounded text-xs">relay.vork.sh</code> — no firewall changes required.<br>
+                <strong class="text-zinc-300">Set to your appliance URL</strong> to use the relay built directly into Vork.
+                See <a href="https://github.com/ludup/vork-relay" target="_blank" class="text-[#fdaa02] hover:underline">vork-relay</a> for the
                 full zero-knowledge specification.
             </p>
-            <label class="form-label" for="app-base-url">Base URL</label>
-            <input type="url" id="app-base-url" class="form-control mb-3"
+            <label class="block text-sm font-medium text-zinc-300 mb-1.5" for="app-base-url">Base URL</label>
+            <input type="url" id="app-base-url"
+                   class="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm mb-3
+                          placeholder:text-zinc-600 focus:outline-none focus:border-[#fdaa02] focus:ring-2 focus:ring-[#fdaa02]/25 transition-colors"
                    placeholder="https://my.vork.app" autocomplete="off">
             <button class="btn btn-primary btn-sm" onclick="saveSettings()">
                 <i class="fa-solid fa-save me-1"></i>Save
@@ -43,19 +46,22 @@
         </div>
     </div>
 
-    <div class="card mb-4 border-primary">
-        <div class="card-header d-flex align-items-center gap-2">
-            <i class="fa-solid fa-bell text-primary"></i>
-            <span class="fw-semibold">Default OOB Authorization Timeout</span>
+    <!-- OOB Timeout card -->
+    <div class="bg-zinc-900 border border-[#fdaa02]/40 rounded-xl mb-4 overflow-hidden">
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+            <i class="fa-solid fa-bell text-[#fdaa02]"></i>
+            <span class="font-semibold text-sm">Default OOB Authorization Timeout</span>
         </div>
-        <div class="card-body">
-            <p class="text-muted small mb-3">
+        <div class="p-4">
+            <p class="text-zinc-500 text-xs leading-relaxed mb-4">
                 How long the relay authorization link remains valid for Telegram and interactive
                 out-of-band requests. Background scheduled jobs use their own per-job timeout.
                 Default: 15 minutes.
             </p>
-            <label class="form-label" for="oob-timeout">Timeout (minutes)</label>
-            <input type="number" id="oob-timeout" class="form-control mb-3"
+            <label class="block text-sm font-medium text-zinc-300 mb-1.5" for="oob-timeout">Timeout (minutes)</label>
+            <input type="number" id="oob-timeout"
+                   class="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm mb-3
+                          focus:outline-none focus:border-[#fdaa02] focus:ring-2 focus:ring-[#fdaa02]/25 transition-colors"
                    min="1" placeholder="15" autocomplete="off">
             <button class="btn btn-primary btn-sm" onclick="saveSettings()">
                 <i class="fa-solid fa-save me-1"></i>Save
@@ -105,6 +111,6 @@
             .catch(e => showAlert('Failed to save: ' + (e.error || e.message || 'unknown error'), 'danger'));
     }
 </script>
-<script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/packages/npm/bootstrap/current/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

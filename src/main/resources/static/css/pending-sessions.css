@@ -9,8 +9,8 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--bs-secondary-color);
-    border-bottom: 2px solid var(--bs-border-color);
+    color: var(--vork-muted);
+    border-bottom: 2px solid var(--vork-border);
     white-space: nowrap;
 }
 
@@ -43,14 +43,14 @@
 .pending-tool-name {
     font-family: monospace;
     font-size: 0.8rem;
-    color: var(--bs-secondary-color);
+    color: var(--vork-muted);
 }
 
 /* ── Input modal ─────────────────────────────────────────────────────────── */
 
 .modal-reasoning {
     background: rgba(255, 255, 255, 0.04);
-    border-left: 3px solid var(--bs-primary);
+    border-left: 3px solid var(--vork-primary);
     border-radius: 0 0.4rem 0.4rem 0;
     padding: 0.55rem 0.8rem;
     font-size: 0.875rem;
